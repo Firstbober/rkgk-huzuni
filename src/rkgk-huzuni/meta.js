@@ -3,10 +3,10 @@
 // @namespace   Violentmonkey Scripts
 // @description A modification loader for rkgk
 // @match       https://staging.rkgk.app/*
-// @grant       GM_addStyle
+// @grant       none
 // @version     0.0.0
 // @author      process.env.AUTHOR
-// @icon
+// @icon        https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png
 // ==/UserScript==
 
 /**
