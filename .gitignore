@@ -1,7 +1,7 @@
 node_modules
 *.log
 /.idea
-/dist
+/dist/normal
 /.nyc_output
 /coverage
 /types

@@ -28,7 +28,7 @@ export default defineConfig(
     ]),
     output: {
       format: 'iife',
-      file: `dist/${name}.user.js`,
+      file: process.env.NODE_ENV == 'production' ? `dist/release/${name}.user.js` : `dist/normal/${name}.user.js`,
       globals: {
         // Note:
         // - VM.solid is just a third-party UMD bundle for solid-js since there is no official one
