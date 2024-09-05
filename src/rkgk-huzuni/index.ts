@@ -36,6 +36,8 @@ async function selfTest() {
     topPanel: topPanel.test(),
     rightPanel: rightPanel.test(),
     scriptManager: scriptManager.test(),
+
+    artworkProtocol: artworkProtocol.test(),
   };
 
   let canPass = true;

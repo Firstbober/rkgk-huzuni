@@ -2,7 +2,11 @@ declare module rkgk_session {
   interface WallInfo {
     chunkSize: number;
     hakuLimits: unknown;
-    online: string[];
+    online: {
+      sessionId: number;
+      nickname: string;
+      brush: string;
+    }[];
     paintArea: number;
   }
 
@@ -12,7 +16,9 @@ declare module rkgk_session {
     userId: string;
     wallId: string;
 
-    wallInfo;
+    wallInfo: WallInfo;
+
+    sendSetBrush(brush: string);
   }
 
   export async function newSession({

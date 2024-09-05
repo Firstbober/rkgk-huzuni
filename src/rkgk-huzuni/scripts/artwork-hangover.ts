@@ -1,4 +1,5 @@
 import { HuzuniAPI, HuzuniScript } from '../huzuni-api';
+import { rkgkInternals } from '../modules/rkgk-internals';
 
 export default class ArtworkHangover implements HuzuniScript {
   api: HuzuniAPI;
@@ -40,23 +41,28 @@ export default class ArtworkHangover implements HuzuniScript {
         const messageText = textarea.value.trim();
         if (messageText.length == 0) return;
 
+        api.artworkProtocol.sendBroadcastMessage({
+          type: 'chatMessage',
+          message: messageText,
+        });
         textarea.value = '';
       }
     });
 
     chat.appendChild(textarea);
 
-    api.artworkProtocol.events.message = (json) => {
-      // const message = document.createElement('span');
-      // message.innerText = `<you>: ${messageText}`;
-      // message.style['borderBottom'] = '1px solid var(--color-panel-border)';
+    // Handle artwork messages
+    api.artworkProtocol.events.message = (sessionId, json) => {
+      if (json.type != 'chatMessage') return;
 
-      // messageList.appendChild(message);
-      // messageList.scrollTo({
-      //   top: messageList.scrollHeight,
-      // });
+      const message = document.createElement('span');
+      message.innerText = `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`;
+      message.style['borderBottom'] = '1px solid var(--color-panel-border)';
 
-      console.log(json);
+      messageList.appendChild(message);
+      messageList.scrollTo({
+        top: messageList.scrollHeight,
+      });
     };
 
     document.getElementsByTagName('main')[0].appendChild(chat);

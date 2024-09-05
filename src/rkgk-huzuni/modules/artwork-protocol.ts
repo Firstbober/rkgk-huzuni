@@ -1,6 +1,11 @@
 import { MixinHandler } from '../mixin-handler';
 import { rkgkInternals } from './rkgk-internals';
 
+interface ArtworkEventHandler {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  message(sessionId: number, json: any): void;
+}
+
 function base64ToBytes(base64) {
   const binString = atob(base64);
   return Uint8Array.from(binString, (m) => m.codePointAt(0));
@@ -13,15 +18,11 @@ function bytesToBase64(bytes) {
   return btoa(binString);
 }
 
-interface ArtworkEventHandler {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  message(json: any): void;
-}
-
 export const artworkProtocol = {
   ARTWORK_MESSAGE_PREFIX: '-- ARTWORK ',
 
-  encodeArtworkMessage(message: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  encodeArtworkMessage(message: any): string {
     const encoded = bytesToBase64(
       new TextEncoder().encode(JSON.stringify(message)),
     );
@@ -46,14 +47,27 @@ export const artworkProtocol = {
         brush.slice(artworkProtocol.ARTWORK_MESSAGE_PREFIX.length),
       );
 
-      artworkProtocol.events.message(message);
+      artworkProtocol.events.message(wallEvent.sessionId, message);
     };
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // sendMessage(data: any) {
+  test() {
+    return document.querySelector('rkgk-brush-editor') != undefined;
+  },
 
-  // },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sendBroadcastMessage(data: any) {
+    const currentCode = (
+      document.querySelector('rkgk-brush-editor') as unknown as {
+        code: string;
+      }
+    ).code;
+
+    rkgkInternals.sendSetBrush(
+      `${artworkProtocol.ARTWORK_MESSAGE_PREFIX}${artworkProtocol.encodeArtworkMessage(data)}`,
+    );
+    rkgkInternals.sendSetBrush(currentCode);
+  },
 
   events: new Proxy(
     {

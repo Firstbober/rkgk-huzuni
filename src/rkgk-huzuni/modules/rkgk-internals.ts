@@ -70,6 +70,7 @@ export const rkgkInternals = {
   },
 
   async disableIndex() {
+    // TODO, this doesnt work no chrom
     window.addEventListener('beforescriptexecute', (ev) => {
       const script = ev.target as HTMLScriptElement;
       if (script.innerHTML.includes('import "rkgk/index.js";')) {
@@ -150,6 +151,17 @@ export const rkgkInternals = {
     rkgkInternals.session.addEventListener('wallEvent', (ev) => {
       rkgkInternals.events.wall((ev as never)['wallEvent']);
     });
+  },
+
+  sendSetBrush(brush: string) {
+    rkgkInternals.session.sendSetBrush(brush);
+  },
+
+  getUsernameBySessionId(sessionId: number): string {
+    for (const user of rkgkInternals.session.wallInfo.online) {
+      if (user.sessionId == sessionId) return user.nickname;
+    }
+    return undefined;
   },
 
   events: new Proxy(
