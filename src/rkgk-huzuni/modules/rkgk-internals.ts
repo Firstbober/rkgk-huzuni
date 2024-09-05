@@ -69,25 +69,17 @@ export const rkgkInternals = {
     return result;
   },
 
-  async disableIndex() {
-    // TODO, this doesnt work no chrom
-    window.addEventListener('beforescriptexecute', (ev) => {
-      const script = ev.target as HTMLScriptElement;
-      if (script.innerHTML.includes('import "rkgk/index.js";')) {
-        const newScript = document.createElement('script');
-        newScript.type = 'module';
-        newScript.innerHTML = script.innerHTML.replaceAll(
-          'import "rkgk/index.js";',
-          '',
-        );
-        newScript.innerHTML += `;console.log('[huzuni] [rkgk-internals] hijacked head import section!');`;
-        document.head.appendChild(newScript);
-
-        ev.preventDefault();
-        ev.stopPropagation();
-        ev.stopImmediatePropagation();
-      }
-    });
+  insertNewIndex() {
+    const oldQuerySelector = document.querySelector;
+    document.querySelector = (value: string) => {
+      if (value != 'main') return oldQuerySelector.apply(document, [value]);
+      setTimeout(async () => {
+        document.querySelector = oldQuerySelector;
+        await rkgkInternals.importRkgkInternals();
+        await rkgkInternals.hijackIndex();
+      }, 1);
+      throw Error('[huzuni] got em');
+    };
   },
 
   async hijackIndex() {
@@ -108,7 +100,10 @@ export const rkgkInternals = {
 
     console.info('[huzuni] [rkgk-internals] removing js-loading from index...');
 
-    newCode = newCode.replaceAll(`document.getElementById('js-loading')`, '');
+    const js_loading = document.createElement('div');
+    js_loading.id = 'js-loading';
+    document.body.appendChild(js_loading);
+
     newCode =
       `
       const Wall = rkgk_wall.Wall;
@@ -140,17 +135,29 @@ export const rkgkInternals = {
   },
 
   async test() {
-    let result = true;
-    result &&= await rkgkInternals.importRkgkInternals();
-    result &&= await rkgkInternals.hijackIndex();
-
-    return result;
+    return true;
   },
 
   setupListeners() {
     rkgkInternals.session.addEventListener('wallEvent', (ev) => {
       rkgkInternals.events.wall((ev as never)['wallEvent']);
     });
+
+    rkgkInternals.events.wall = (wallEvent) => {
+      if (wallEvent.kind.event == 'join') {
+        rkgkInternals.session.wallInfo.online.push({
+          sessionId: wallEvent.sessionId,
+          brush: wallEvent.kind.init.brush,
+          nickname: wallEvent.kind.nickname,
+        });
+      } else if (wallEvent.kind.event == 'leave') {
+        for (let i = 0; i < rkgkInternals.session.wallInfo.online.length; i++) {
+          const user = rkgkInternals.session.wallInfo.online[i];
+          if (user.sessionId == wallEvent.sessionId)
+            rkgkInternals.session.wallInfo.online.splice(i, 1);
+        }
+      }
+    };
   },
 
   sendSetBrush(brush: string) {

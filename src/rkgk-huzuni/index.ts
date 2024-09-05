@@ -13,6 +13,8 @@ import ArtworkHangover from './scripts/artwork-hangover';
 // BEFORE DOM IS LOADED
 //
 
+rkgkInternals.insertNewIndex();
+
 // Create namespace for further use
 globalThis.huzuni = {};
 
@@ -23,7 +25,7 @@ console.log(
 
 // Disables index from loading, so we can
 // modify it and extract what we need.
-rkgkInternals.disableIndex();
+// rkgkInternals.disableIndex();
 
 //
 // AFTER DOM IS LOADED
