@@ -42,12 +42,10 @@ export const rightPanel = {
   },
 
   test() {
-    return rightPanel.getPanelElement() != undefined;
-  },
+    if (rightPanel.getPanelElement() == undefined) return false;
 
-  start() {
-    const panel = rightPanel.getPanelElement();
-    panel.style['flexWrap'] = 'wrap';
+    rightPanel.getPanelElement().style['flexWrap'] = 'wrap';
+    return true;
   },
 
   appendEnd(element: HTMLElement) {

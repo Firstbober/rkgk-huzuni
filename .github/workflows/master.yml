@@ -1,17 +1,19 @@
-name: Build and Publish JS Artifact
+name: Build and Publish to Separate Branch
 
 on:
   push:
     branches:
-      - master  # Change this to your target branch, e.g., 'main', 'master', etc.
+      - master  # Change this to your main development branch
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for all branches
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -24,8 +26,21 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: rkgk-huzuni-user-js
-          path: ./dist/rkgk-huzuni.user.js
+      - name: Deploy to dist branch
+        if: success()
+        run: |
+          # Configure Git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Checkout the target branch (replace 'gh-pages' with your target branch)
+          git checkout -B gh-actions-dist
+
+          # Copy the build output to the target branch
+          mkdir -p dist
+          cp ./dist/rkgk-huzuni.user.js ./dist/
+
+          # Commit and push changes
+          git add ./dist/rkgk-huzuni.user.js
+          git commit -m "Build and deploy $(date +'%Y-%m-%d %H:%M:%S')"
+          git push -u origin gh-pages --force

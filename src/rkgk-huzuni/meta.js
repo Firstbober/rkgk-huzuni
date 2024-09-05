@@ -7,6 +7,7 @@
 // @version     0.0.0
 // @author      process.env.AUTHOR
 // @icon        https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png
+// @run-at document-start
 // ==/UserScript==
 
 /**
