@@ -1,4 +1,4 @@
-name: Build and Publish to Separate Branch
+name: Build and Publish as a Release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - master  # Change this to your main development branch
 
 jobs:
-  build-and-publish:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,26 +26,25 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Deploy to dist branch
-        if: success()
-        run: |
-          # Set up Git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use the default GitHub token provided by Actions
+        with:
+          tag_name: v1.0.0  # You can adjust this to use dynamic versioning
+          release_name: Release v1.0.0  # Change this to match your versioning strategy
+          body: |
+            This is an automated release of the latest build.
+          draft: false
+          prerelease: false
 
-          # Save the built file to a temporary location
-          mv ./dist/rkgk-huzuni.user.js /tmp/rkgk-huzuni.user.js
-
-          # Switch to the target branch in a clean state
-          git checkout --orphan gh-pages
-
-          # Remove all existing files from the branch
-          git rm -rf .
-
-          # Move the built file back to the root of the branch
-          mv /tmp/rkgk-huzuni.user.js ./rkgk-huzuni.user.js
-
-          # Add, commit, and push the file to the target branch
-          git add rkgk-huzuni.user.js
-          git commit -m "Build and deploy $(date +'%Y-%m-%d %H:%M:%S')"
-          git push -u origin gh-pages --force
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use the default GitHub token provided by Actions
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/rkgk-huzuni.user.js
+          asset_name: rkgk-huzuni.user.js
+          asset_content_type: application/javascript
