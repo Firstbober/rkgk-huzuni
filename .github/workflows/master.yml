@@ -29,18 +29,23 @@ jobs:
       - name: Deploy to dist branch
         if: success()
         run: |
-          # Configure Git
+          # Set up Git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Checkout the target branch (replace 'gh-pages' with your target branch)
-          git checkout -B gh-actions-dist
+          # Save the built file to a temporary location
+          mv ./dist/rkgk-huzuni.user.js /tmp/rkgk-huzuni.user.js
 
-          # Copy the build output to the target branch
-          mkdir -p dist
-          cp ./dist/rkgk-huzuni.user.js ./dist/
+          # Switch to the target branch in a clean state
+          git checkout --orphan gh-pages
 
-          # Commit and push changes
-          git add ./dist/rkgk-huzuni.user.js
+          # Remove all existing files from the branch
+          git rm -rf .
+
+          # Move the built file back to the root of the branch
+          mv /tmp/rkgk-huzuni.user.js ./rkgk-huzuni.user.js
+
+          # Add, commit, and push the file to the target branch
+          git add rkgk-huzuni.user.js
           git commit -m "Build and deploy $(date +'%Y-%m-%d %H:%M:%S')"
           git push -u origin gh-pages --force
