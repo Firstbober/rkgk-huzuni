@@ -40,20 +40,24 @@ export default class ArtworkHangover implements HuzuniScript {
         const messageText = textarea.value.trim();
         if (messageText.length == 0) return;
 
-        const message = document.createElement('span');
-        message.innerText = `<you>: ${messageText}`;
-        message.style['borderBottom'] = '1px solid var(--color-panel-border)';
-
-        messageList.appendChild(message);
-        messageList.scrollTo({
-          top: messageList.scrollHeight,
-        });
-
         textarea.value = '';
       }
     });
 
     chat.appendChild(textarea);
+
+    api.artworkProtocol.events.message = (json) => {
+      // const message = document.createElement('span');
+      // message.innerText = `<you>: ${messageText}`;
+      // message.style['borderBottom'] = '1px solid var(--color-panel-border)';
+
+      // messageList.appendChild(message);
+      // messageList.scrollTo({
+      //   top: messageList.scrollHeight,
+      // });
+
+      console.log(json);
+    };
 
     document.getElementsByTagName('main')[0].appendChild(chat);
   }

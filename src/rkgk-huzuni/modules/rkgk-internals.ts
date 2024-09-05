@@ -1,11 +1,19 @@
 import { MixinHandler } from '../mixin-handler';
 
 export interface SessionEventHandlers {
-  wall(sessionId: number, wallEvent: unknown): void;
+  wall(wallEvent: {
+    sessionId: number;
+    kind: {
+      event: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      [index: string]: any;
+    };
+  }): void;
 }
 
 export const rkgkInternals = {
   session: {} as rkgk_session.Session,
+  currentUserId: 0,
 
   async handleRkGkImports(body, name: string, path: string, imported: boolean) {
     if (imported) {
@@ -139,13 +147,8 @@ export const rkgkInternals = {
   },
 
   setupListeners() {
-    console.log(rkgkInternals.session);
-
     rkgkInternals.session.addEventListener('wallEvent', (ev) => {
-      const event = (ev as never)['wallEvent'] as {
-        sessionId: number;
-      };
-      rkgkInternals.events.wall(event.sessionId, event);
+      rkgkInternals.events.wall((ev as never)['wallEvent']);
     });
   },
 

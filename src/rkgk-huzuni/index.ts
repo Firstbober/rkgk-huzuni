@@ -3,10 +3,11 @@ import uiCSS from './ui.css';
 
 import { rightPanel, topPanel } from './modules/panels';
 import { scriptManager } from './modules/script-manager';
+import { rkgkInternals } from './modules/rkgk-internals';
+import { artworkProtocol } from './modules/artwork-protocol';
 
 import HuzuniOverlay from './scripts/huzuni-overlay';
 import ArtworkHangover from './scripts/artwork-hangover';
-import { rkgkInternals } from './modules/rkgk-internals';
 
 //
 // BEFORE DOM IS LOADED
@@ -70,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
         uiCssStyle.innerHTML = uiCSS;
         document.head.appendChild(uiCssStyle);
       }
+
+      artworkProtocol.setupListeners();
 
       scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay());
       scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());
