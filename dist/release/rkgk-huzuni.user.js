@@ -60,6 +60,198 @@ const rightPanel = {
   }
 };
 
+class MixinHandler {
+  constructor() {
+    this.mixins = new Map();
+  }
+  set(target, prop, value) {
+    if (typeof value !== 'function') {
+      console.error("[huzuni] can't set mixin with value different than function");
+      return false;
+    }
+    if (!this.mixins.has(prop)) {
+      this.mixins.set(prop, []);
+    }
+    this.mixins.get(prop).push(value);
+    console.debug(`[huzuni] registered mixin for`, prop);
+    return true;
+  }
+  get(target, p) {
+    if (typeof target[p] === 'function') {
+      return new Proxy(target[p], {
+        apply: (targetFn, thisArg, argumentsList) => {
+          if (!this.mixins.get(p)) {
+            return Reflect.apply(targetFn, thisArg, argumentsList);
+          }
+          for (const mixs of this.mixins.get(p)) {
+            mixs.apply(target, argumentsList);
+          }
+          return Reflect.apply(targetFn, thisArg, argumentsList);
+        }
+      });
+    } else {
+      return Reflect.get(target, p);
+    }
+  }
+}
+
+const rkgkInternals = {
+  session: {},
+  currentUserId: 0,
+  async handleRkGkImports(body, name, path, imported) {
+    if (imported) {
+      console.info(`[huzuni] [rkgk-internals] imported "rkgk_${name}"!`);
+      globalThis['rkgk_' + name] = body;
+      return;
+    }
+    console.info(`[huzuni] [rkgk-internals] importing module "rkgk_${name}" with path "${path}"...`);
+    try {
+      const body = await import(`${path}`);
+      rkgkInternals.handleRkGkImports(body, name, path, true);
+      return true;
+    } catch (error) {
+      console.error(`[huzuni] [rkgk-internals] importing module "rkgk_${name}" with path "${path}" failed!`);
+      return false;
+    }
+  },
+  async importRkgkInternals() {
+    let result = true;
+    result && (result = await rkgkInternals.handleRkGkImports(null, 'wall', 'rkgk/wall.js', false));
+    result && (result = await rkgkInternals.handleRkGkImports(null, 'session', 'rkgk/session.js', false));
+    result && (result = await rkgkInternals.handleRkGkImports(null, 'framework', 'rkgk/framework.js', false));
+    result && (result = await rkgkInternals.handleRkGkImports(null, 'reticle_renderer', 'rkgk/reticle-renderer.js', false));
+    return result;
+  },
+  insertNewIndex() {
+    const oldQuerySelector = document.querySelector;
+    document.querySelector = value => {
+      if (value != 'main') return oldQuerySelector.apply(document, [value]);
+      setTimeout(async () => {
+        document.querySelector = oldQuerySelector;
+        await rkgkInternals.importRkgkInternals();
+        await rkgkInternals.hijackIndex();
+      }, 1);
+      throw Error('[huzuni] got em');
+    };
+  },
+  async hijackIndex() {
+    console.info('[huzuni] [rkgk-internals] starting hijacking of index.js...');
+    const code = await (await fetch('static/index.js')).text();
+    let gatekeeper = true;
+    let newCode = '';
+    for (const line of code.split('\n')) {
+      if (line.startsWith('const updateInterval = 1000 / 60;')) {
+        gatekeeper = false;
+      }
+      if (gatekeeper) continue;
+      newCode += line + '\n';
+    }
+    console.info('[huzuni] [rkgk-internals] removing js-loading from index...');
+    const js_loading = document.createElement('div');
+    js_loading.id = 'js-loading';
+    document.body.appendChild(js_loading);
+    newCode = `
+      const Wall = rkgk_wall.Wall;
+
+      const getLoginSecret = rkgk_session.getLoginSecret;
+      const getUserId = rkgk_session.getUserId;
+      const isUserLoggedIn = rkgk_session.isUserLoggedIn;
+      const newSession = huzuni.rkgk_overrides.newSession;
+      const registerUser = rkgk_session.registerUser;
+      const waitForLogin = rkgk_session.waitForLogin;
+
+      const debounce = rkgk_framework.debounce;
+      const ReticleCursor = rkgk_reticle_renderer.ReticleCursor;
+    ` + newCode;
+    globalThis.huzuni.rkgk_overrides = {
+      newSession: async values => {
+        rkgkInternals.session = await rkgk_session.newSession(values);
+        rkgkInternals.setupListeners();
+        return rkgkInternals.session;
+      }
+    };
+    eval(newCode);
+    return true;
+  },
+  async test() {
+    return true;
+  },
+  setupListeners() {
+    rkgkInternals.session.addEventListener('wallEvent', ev => {
+      rkgkInternals.events.wall(ev['wallEvent']);
+    });
+    rkgkInternals.events.wall = wallEvent => {
+      if (wallEvent.kind.event == 'join') {
+        rkgkInternals.session.wallInfo.online.push({
+          sessionId: wallEvent.sessionId,
+          brush: wallEvent.kind.init.brush,
+          nickname: wallEvent.kind.nickname
+        });
+      } else if (wallEvent.kind.event == 'leave') {
+        for (let i = 0; i < rkgkInternals.session.wallInfo.online.length; i++) {
+          const user = rkgkInternals.session.wallInfo.online[i];
+          if (user.sessionId == wallEvent.sessionId) rkgkInternals.session.wallInfo.online.splice(i, 1);
+        }
+      }
+    };
+  },
+  sendSetBrush(brush) {
+    rkgkInternals.session.sendSetBrush(brush);
+  },
+  getUsernameBySessionId(sessionId) {
+    for (const user of rkgkInternals.session.wallInfo.online) {
+      if (user.sessionId == sessionId) return user.nickname;
+    }
+    return undefined;
+  },
+  events: new Proxy({
+    wall() {}
+  }, new MixinHandler())
+};
+
+function base64ToBytes(base64) {
+  const binString = atob(base64);
+  return Uint8Array.from(binString, m => m.codePointAt(0));
+}
+function bytesToBase64(bytes) {
+  const binString = Array.from(bytes, byte => String.fromCodePoint(byte)).join('');
+  return btoa(binString);
+}
+const artworkProtocol = {
+  ARTWORK_MESSAGE_PREFIX: '-- ARTWORK ',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  encodeArtworkMessage(message) {
+    const encoded = bytesToBase64(new TextEncoder().encode(JSON.stringify(message)));
+    return encoded;
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  decodeArtworkMessage(message) {
+    return JSON.parse(new TextDecoder().decode(base64ToBytes(message)));
+  },
+  setupListeners() {
+    console.log(`[huzuni] [artwork-protocol] setting up listeners`);
+    rkgkInternals.events.wall = wallEvent => {
+      if (wallEvent.kind.event != 'setBrush') return;
+      const brush = wallEvent.kind.brush;
+      if (!brush.startsWith(artworkProtocol.ARTWORK_MESSAGE_PREFIX)) return;
+      const message = artworkProtocol.decodeArtworkMessage(brush.slice(artworkProtocol.ARTWORK_MESSAGE_PREFIX.length));
+      artworkProtocol.events.message(wallEvent.sessionId, message);
+    };
+  },
+  test() {
+    return document.querySelector('rkgk-brush-editor') != undefined;
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sendBroadcastMessage(data) {
+    const currentCode = document.querySelector('rkgk-brush-editor').code;
+    rkgkInternals.sendSetBrush(`${artworkProtocol.ARTWORK_MESSAGE_PREFIX}${artworkProtocol.encodeArtworkMessage(data)}`);
+    rkgkInternals.sendSetBrush(currentCode);
+  },
+  events: new Proxy({
+    message() {}
+  }, new MixinHandler())
+};
+
 const huzuniUI = {
   tabs(labels, content) {
     const uiTabs = document.createElement('div');
@@ -102,6 +294,7 @@ class HuzuniAPI {
     this.topPanel = topPanel;
     this.rightPanel = rightPanel;
     this.huzuniUI = huzuniUI;
+    this.artworkProtocol = artworkProtocol;
   }
 }
 
@@ -206,156 +399,36 @@ class ArtworkHangover {
       if (ev.key == 'Enter') {
         const messageText = textarea.value.trim();
         if (messageText.length == 0) return;
-        const message = document.createElement('span');
-        message.innerText = `<you>: ${messageText}`;
-        message.style['borderBottom'] = '1px solid var(--color-panel-border)';
-        messageList.appendChild(message);
-        messageList.scrollTo({
-          top: messageList.scrollHeight
+        api.artworkProtocol.sendBroadcastMessage({
+          type: 'chatMessage',
+          message: messageText
         });
         textarea.value = '';
       }
     });
     chat.appendChild(textarea);
+
+    // Handle artwork messages
+    api.artworkProtocol.events.message = (sessionId, json) => {
+      if (json.type != 'chatMessage') return;
+      const message = document.createElement('span');
+      message.innerText = `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`;
+      message.style['borderBottom'] = '1px solid var(--color-panel-border)';
+      messageList.appendChild(message);
+      messageList.scrollTo({
+        top: messageList.scrollHeight
+      });
+    };
     document.getElementsByTagName('main')[0].appendChild(chat);
   }
   stop() {}
 }
 
-class MixinHandler {
-  constructor() {
-    this.mixins = new Map();
-  }
-  set(target, prop, value) {
-    if (typeof value !== 'function') {
-      console.error("[huzuni] can't set mixin with value different than function");
-      return false;
-    }
-    if (!this.mixins.has(prop)) {
-      this.mixins.set(prop, []);
-    }
-    this.mixins.get(prop).push(value);
-    console.debug(`[huzuni] registered mixin for`, prop);
-    return true;
-  }
-  get(target, p) {
-    if (typeof target[p] === 'function') {
-      return new Proxy(target[p], {
-        apply: (targetFn, thisArg, argumentsList) => {
-          if (!this.mixins.get(p)) {
-            return Reflect.apply(targetFn, thisArg, argumentsList);
-          }
-          for (const mixs of this.mixins.get(p)) {
-            mixs.apply(target, argumentsList);
-          }
-          return Reflect.apply(targetFn, thisArg, argumentsList);
-        }
-      });
-    } else {
-      return Reflect.get(target, p);
-    }
-  }
-}
-
-const rkgkInternals = {
-  session: {},
-  async handleRkGkImports(body, name, path, imported) {
-    if (imported) {
-      console.info(`[huzuni] [rkgk-internals] imported "rkgk_${name}"!`);
-      globalThis['rkgk_' + name] = body;
-      return;
-    }
-    console.info(`[huzuni] [rkgk-internals] importing module "rkgk_${name}" with path "${path}"...`);
-    try {
-      const body = await import(`${path}`);
-      rkgkInternals.handleRkGkImports(body, name, path, true);
-      return true;
-    } catch (error) {
-      console.error(`[huzuni] [rkgk-internals] importing module "rkgk_${name}" with path "${path}" failed!`);
-      return false;
-    }
-  },
-  async importRkgkInternals() {
-    let result = true;
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'wall', 'rkgk/wall.js', false));
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'session', 'rkgk/session.js', false));
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'framework', 'rkgk/framework.js', false));
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'reticle_renderer', 'rkgk/reticle-renderer.js', false));
-    return result;
-  },
-  async disableIndex() {
-    window.addEventListener('beforescriptexecute', ev => {
-      const script = ev.target;
-      if (script.innerHTML.includes('import "rkgk/index.js";')) {
-        const newScript = document.createElement('script');
-        newScript.type = 'module';
-        newScript.innerHTML = script.innerHTML.replaceAll('import "rkgk/index.js";', '');
-        newScript.innerHTML += `;console.log('[huzuni] [rkgk-internals] hijacked head import section!');`;
-        document.head.appendChild(newScript);
-        ev.preventDefault();
-        ev.stopPropagation();
-        ev.stopImmediatePropagation();
-      }
-    });
-  },
-  async hijackIndex() {
-    console.info('[huzuni] [rkgk-internals] starting hijacking of index.js...');
-    const code = await (await fetch('static/index.js')).text();
-    let gatekeeper = true;
-    let newCode = '';
-    for (const line of code.split('\n')) {
-      if (line.startsWith('const updateInterval = 1000 / 60;')) {
-        gatekeeper = false;
-      }
-      if (gatekeeper) continue;
-      newCode += line + '\n';
-    }
-    console.info('[huzuni] [rkgk-internals] removing js-loading from index...');
-    newCode = newCode.replaceAll(`document.getElementById('js-loading')`, '');
-    newCode = `
-      const Wall = rkgk_wall.Wall;
-
-      const getLoginSecret = rkgk_session.getLoginSecret;
-      const getUserId = rkgk_session.getUserId;
-      const isUserLoggedIn = rkgk_session.isUserLoggedIn;
-      const newSession = huzuni.rkgk_overrides.newSession;
-      const registerUser = rkgk_session.registerUser;
-      const waitForLogin = rkgk_session.waitForLogin;
-
-      const debounce = rkgk_framework.debounce;
-      const ReticleCursor = rkgk_reticle_renderer.ReticleCursor;
-    ` + newCode;
-    globalThis.huzuni.rkgk_overrides = {
-      newSession: async values => {
-        rkgkInternals.session = await rkgk_session.newSession(values);
-        rkgkInternals.setupListeners();
-        return rkgkInternals.session;
-      }
-    };
-    eval(newCode);
-    return true;
-  },
-  async test() {
-    let result = true;
-    result && (result = await rkgkInternals.importRkgkInternals());
-    result && (result = await rkgkInternals.hijackIndex());
-    return result;
-  },
-  setupListeners() {
-    console.log(rkgkInternals.session);
-    rkgkInternals.session.addEventListener('wallEvent', ev => {
-      const event = ev['wallEvent'];
-      rkgkInternals.events.wall(event.sessionId, event);
-    });
-  },
-  events: new Proxy({
-    wall() {}
-  }, new MixinHandler())
-};
-
 //
 // BEFORE DOM IS LOADED
 //
+
+rkgkInternals.insertNewIndex();
 
 // Create namespace for further use
 globalThis.huzuni = {};
@@ -363,7 +436,7 @@ console.log(`%chuzuni by Firstbober!`, 'color: lightblue; font-size: x-large; fo
 
 // Disables index from loading, so we can
 // modify it and extract what we need.
-rkgkInternals.disableIndex();
+// rkgkInternals.disableIndex();
 
 //
 // AFTER DOM IS LOADED
@@ -374,7 +447,8 @@ async function selfTest() {
     rkgkInternals: await rkgkInternals.test(),
     topPanel: topPanel.test(),
     rightPanel: rightPanel.test(),
-    scriptManager: scriptManager.test()
+    scriptManager: scriptManager.test(),
+    artworkProtocol: artworkProtocol.test()
   };
   let canPass = true;
   for (const [key, value] of Object.entries(results)) {
@@ -401,6 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uiCssStyle.innerHTML = css_248z;
         document.head.appendChild(uiCssStyle);
       }
+      artworkProtocol.setupListeners();
       scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay());
       scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());
     }
