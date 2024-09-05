@@ -1,0 +1,22 @@
+.huzuni-ui-tabs {
+  border: 1px solid var(--color-panel-border);
+}
+
+.huzuni-ui-tabs > div:first-child {
+  border-bottom: 1px solid var(--color-panel-border);
+}
+
+.huzuni-ui-tabs > div:first-child span {
+  padding: 2px;
+  padding-left: 6px;
+  padding-right: 6px;
+  cursor: pointer;
+}
+
+.huzuni-ui-tabs > div:first-child span:hover {
+  background-color: var(--color-shaded-background);
+}
+
+.huzuni-ui-tabs > div:first-child span.active {
+  background-color: var(--color-panel-border);
+}
