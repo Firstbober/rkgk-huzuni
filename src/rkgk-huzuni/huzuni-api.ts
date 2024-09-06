@@ -5,6 +5,8 @@ import { rkgkInternals } from './modules/rkgk-internals';
 import { scriptManager } from './modules/script-manager';
 
 export class HuzuniAPI {
+  enabled: boolean = false;
+
   topPanel = topPanel;
   rightPanel = rightPanel;
   huzuniUI = huzuniUI;

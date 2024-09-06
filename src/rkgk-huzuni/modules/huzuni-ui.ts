@@ -13,6 +13,7 @@ class HuzuniUI {
     uiTabs.classList.add('huzuni-ui-tabs');
 
     const uiTabsButtonsContainer = document.createElement('div');
+    uiTabsButtonsContainer.classList.add('huzuni-ui-tabs-labels');
     for (const label of labels) {
       const span = document.createElement('span');
       span.innerText = label;
@@ -32,7 +33,9 @@ class HuzuniUI {
 
     uiTabs.appendChild(uiTabsContainer);
 
-    const uiTabsButtons = uiTabs.querySelectorAll('div:first-child>span');
+    const uiTabsButtons = uiTabs.querySelectorAll(
+      '.huzuni-ui-tabs-labels>span',
+    );
     const uiTabsContent = uiTabs.querySelectorAll(
       '.huzuni-ui-tabs-container>*',
     );

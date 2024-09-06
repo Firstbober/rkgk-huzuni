@@ -282,6 +282,7 @@ class HuzuniUI {
     const uiTabs = document.createElement('div');
     uiTabs.classList.add('huzuni-ui-tabs');
     const uiTabsButtonsContainer = document.createElement('div');
+    uiTabsButtonsContainer.classList.add('huzuni-ui-tabs-labels');
     for (const label of labels) {
       const span = document.createElement('span');
       span.innerText = label;
@@ -296,7 +297,7 @@ class HuzuniUI {
       return d;
     }));
     uiTabs.appendChild(uiTabsContainer);
-    const uiTabsButtons = uiTabs.querySelectorAll('div:first-child>span');
+    const uiTabsButtons = uiTabs.querySelectorAll('.huzuni-ui-tabs-labels>span');
     const uiTabsContent = uiTabs.querySelectorAll('.huzuni-ui-tabs-container>*');
     for (let y = 0; y < uiTabsContent.length; y++) {
       if (y == 0) continue;
@@ -321,6 +322,7 @@ const huzuniUI = new HuzuniUI();
 
 class HuzuniAPI {
   constructor() {
+    this.enabled = false;
     this.topPanel = topPanel;
     this.rightPanel = rightPanel;
     this.huzuniUI = huzuniUI;
@@ -330,21 +332,25 @@ class HuzuniAPI {
   }
 }
 
-class ScriptManager {
+let ScriptManager$1 = class ScriptManager {
   constructor() {
     this.scripts = new Map();
   }
   test() {
     return true;
   }
-  registerScript(name, script) {
+  registerScript(name, script, canBeDisabled = true) {
     if (this.scripts.has(name)) {
       console.error(`[huzuni] [script-manager] cannot load another script with name "${name}"`);
       return false;
     }
     console.log(`[huzuni] [script-manager] registered new script "${name}"`);
-    this.scripts.set(name, script);
-    this.enableScript(name);
+    this.scripts.set(name, {
+      script,
+      enabled: false,
+      canBeDisabled
+    });
+    if (localStorage.getItem(`huzuni.internal-script.${name}.disabled`) == undefined) this.enableScript(name);
     return true;
   }
   enableScript(name) {
@@ -354,7 +360,10 @@ class ScriptManager {
     }
     console.log(`[huzuni] [script-manager] enabled script "${name}"`);
     const api = new HuzuniAPI();
-    this.scripts.get(name).start(api);
+    api.enabled = true;
+    this.scripts.get(name).apiInstance = api;
+    this.scripts.get(name).enabled = true;
+    this.scripts.get(name).script.start(api);
   }
   disableScript(name) {
     if (!this.scripts.has(name)) {
@@ -362,10 +371,12 @@ class ScriptManager {
       return;
     }
     console.log(`[huzuni] [script-manager] disabled script "${name}"`);
-    this.scripts.get(name).stop();
+    this.scripts.get(name).apiInstance.enabled = false;
+    this.scripts.get(name).enabled = false;
+    this.scripts.get(name).script.stop();
   }
-}
-const scriptManager = new ScriptManager();
+};
+const scriptManager = new ScriptManager$1();
 
 /*
 // ==Huzuni Script==
@@ -387,15 +398,16 @@ class Something {
 return Something;
 */
 
-class HuzuniOverlay {
-  constructor() {
+class ScriptManager {
+  constructor(api) {
     this.loadedIds = [];
     this.storageKeys = {
-      ScriptManager: {
-        code: 'huzuni-overlay.script-manager.code',
-        scripts: 'huzuni-overlay.script-manager.scripts'
-      }
+      code: 'huzuni-overlay.script-manager.code',
+      scripts: 'huzuni-overlay.script-manager.scripts'
     };
+    this.api = api;
+    this.setupScriptManagerUI();
+    this.checkScriptStorage();
   }
   getScriptMetadata(code) {
     let splitted = code.split('==Huzuni Script==');
@@ -436,9 +448,9 @@ class HuzuniOverlay {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getScriptsStore() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let scriptsStore = localStorage.getItem(this.storageKeys.ScriptManager.scripts);
+    let scriptsStore = localStorage.getItem(this.storageKeys.scripts);
     if (scriptsStore == undefined) {
-      localStorage.setItem(this.storageKeys.ScriptManager.scripts, JSON.stringify({}));
+      localStorage.setItem(this.storageKeys.scripts, JSON.stringify({}));
       scriptsStore = {};
     } else {
       scriptsStore = JSON.parse(scriptsStore);
@@ -446,6 +458,25 @@ class HuzuniOverlay {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return scriptsStore;
+  }
+  getScriptListElement(name, description, author) {
+    const root = document.createElement('div');
+    root.style.display = 'flex';
+    root.style.width = '100%';
+    root.style.justifyContent = 'space-between';
+    root.style.padding = '4px';
+    root.style.boxSizing = 'border-box';
+    root.innerHTML = `
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-weight: bold;">${name}</span>
+        <span style="font-size: smaller;">${description} ; made by ${author}</span>
+      </div>
+      <div style="display: flex">
+        <input type="checkbox" style="margin-right: 8px" class="disable" />
+        <button style="background-color: var(--color-error); color: white;" class="delete">DELETE</button>
+      </div>
+    `;
+    return root;
   }
   checkScriptStorage() {
     const store = this.getScriptsStore();
@@ -462,7 +493,25 @@ class HuzuniOverlay {
       }
       console.log(`[huzuni-overlay] loaded!`);
     }
-    localStorage.setItem(this.storageKeys.ScriptManager.scripts, JSON.stringify(store));
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
+    for (const id of Object.keys(store)) {
+      const script = store[id];
+      const node = this.getScriptListElement(script.metadata.name, script.metadata.description, script.metadata.author);
+      node.querySelector('.delete').addEventListener('click', () => {
+        this.removeScript(id);
+        node.remove();
+      });
+      node.querySelector('.disable').checked = store[id].enabled;
+      node.querySelector('.disable').addEventListener('change', () => {
+        if (node.querySelector('.disable').checked) {
+          if (store[id].enabled) return;
+          this.enableScript(id);
+        } else {
+          this.disableScript(id);
+        }
+      });
+      this.scriptListNode.appendChild(node);
+    }
   }
   addScript(metadata, code) {
     const scriptsStore = this.getScriptsStore();
@@ -475,8 +524,32 @@ class HuzuniOverlay {
       code,
       enabled: true
     };
-    localStorage.setItem(this.storageKeys.ScriptManager.scripts, JSON.stringify(scriptsStore));
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(scriptsStore));
     return true;
+  }
+  removeScript(id) {
+    this.disableScript(id);
+    const store = this.getScriptsStore();
+    delete store[id];
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
+  }
+  enableScript(id) {
+    const store = this.getScriptsStore();
+    store[id].enabled = true;
+    try {
+      this.api.scriptManager.enableScript(id);
+    } catch (error) {
+      store[id].enabled = false;
+      console.error(`[huzuni-overlay] [${id}] fatal error while enabling:`, error);
+    }
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
+    return true;
+  }
+  disableScript(id) {
+    const store = this.getScriptsStore();
+    store[id].enabled = false;
+    this.api.scriptManager.disableScript(id);
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
   }
   createCodeEditor() {
     const root = document.createElement('div');
@@ -486,7 +559,7 @@ class HuzuniOverlay {
     root.appendChild(rkgkCodeEditor);
     root.style['marginTop'] = '6px';
     rkgkCodeEditor.addEventListener('.codeChanged', () => {
-      localStorage.setItem(this.storageKeys.ScriptManager.code, rkgkCodeEditor.code);
+      localStorage.setItem(this.storageKeys.code, rkgkCodeEditor.code);
     });
 
     // Error listing
@@ -520,6 +593,7 @@ class HuzuniOverlay {
         return;
       }
       rkgkCodeEditor.setCode('');
+      errors.textContent = 'added script!';
       this.checkScriptStorage();
     });
     buttons.querySelector('.clear').addEventListener('click', () => {
@@ -530,8 +604,8 @@ class HuzuniOverlay {
     return {
       root,
       finish: () => {
-        if (localStorage.getItem(this.storageKeys.ScriptManager.code)) {
-          rkgkCodeEditor.setCode(localStorage.getItem(this.storageKeys.ScriptManager.code));
+        if (localStorage.getItem(this.storageKeys.code)) {
+          rkgkCodeEditor.setCode(localStorage.getItem(this.storageKeys.code));
         }
       }
     };
@@ -543,11 +617,37 @@ class HuzuniOverlay {
       <span style="font-size: medium;">Script Manager</span>
     `;
     const codeEditor = this.createCodeEditor();
-    const c2 = document.createElement('div');
-    c2.innerText = 'Script List';
-    scriptManagerUI.appendChild(this.api.huzuniUI.tabs(['Code Editor', 'Script List'], [codeEditor.root, c2]));
+    this.scriptListNode = document.createElement('div');
+    this.scriptListNode.style.display = 'flex';
+    this.scriptListNode.style.flexDirection = 'column';
+    this.scriptListNode.style.maxHeight = '300px';
+    this.scriptListNode.style.overflowY = 'auto';
+    this.scriptListNode.style.width = '100%';
+    this.scriptListNode.style.boxSizing = 'border-box';
+    for (const script of scriptManager.scripts) {
+      const node = this.getScriptListElement(script[0], 'huzuni internal script', 'huzuni');
+      node.querySelector('.delete').remove();
+      node.querySelector('.disable').checked = script[1].enabled;
+      node.querySelector('.disable').addEventListener('change', () => {
+        if (node.querySelector('.disable').checked) {
+          localStorage.removeItem(`huzuni.internal-script.${script[0]}.disabled`);
+          this.api.scriptManager.enableScript(script[0]);
+        } else {
+          localStorage.setItem(`huzuni.internal-script.${script[0]}.disabled`, 'yes');
+          this.api.scriptManager.disableScript(script[0]);
+        }
+      });
+      if (!script[1].canBeDisabled) node.querySelector('.disable').disabled = true;
+      this.scriptListNode.appendChild(node);
+    }
+    scriptManagerUI.appendChild(this.api.huzuniUI.tabs(['Code Editor', 'Script List'], [codeEditor.root, this.scriptListNode]));
     this.api.rightPanel.appendEnd(scriptManagerUI);
     codeEditor.finish();
+  }
+}
+class HuzuniOverlay {
+  constructor() {
+    this.storageKeys = {};
   }
   setupHuzuniMenuBar() {
     const huzuniButton = document.createElement('div');
@@ -564,8 +664,7 @@ class HuzuniOverlay {
   start(api) {
     this.api = api;
     this.setupHuzuniMenuBar();
-    this.setupScriptManagerUI();
-    this.checkScriptStorage();
+    this.scriptManager = new ScriptManager(api);
   }
   stop() {}
 }
@@ -615,6 +714,7 @@ class ArtworkHangover {
 
     // Handle artwork messages
     api.artworkProtocol.events.message = (sessionId, json) => {
+      if (!api.enabled) return;
       if (json.type != 'chatMessage') return;
       const message = document.createElement('span');
       message.innerText = `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`;
@@ -624,9 +724,12 @@ class ArtworkHangover {
         top: messageList.scrollHeight
       });
     };
+    this.chatElement = chat;
     document.getElementsByTagName('main')[0].appendChild(chat);
   }
-  stop() {}
+  stop() {
+    this.chatElement.remove();
+  }
 }
 
 //
@@ -676,8 +779,9 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log(`[huzuni] all self tests passed!`);
       huzuniUI.setupCSS();
       artworkProtocol.setupListeners();
-      scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay());
       scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());
+      // Always must be last
+      scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay(), false);
     }
   })();
 });

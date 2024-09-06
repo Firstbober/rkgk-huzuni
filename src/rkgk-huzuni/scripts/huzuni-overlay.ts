@@ -1,4 +1,5 @@
 import { HuzuniAPI, HuzuniScript } from '../huzuni-api';
+import { scriptManager as huzuni_scriptManager } from '../modules/script-manager';
 
 interface ScriptMetadata {
   name: string;
@@ -26,17 +27,23 @@ class Something {
 return Something;
 */
 
-export default class HuzuniOverlay implements HuzuniScript {
+class ScriptManager {
   api: HuzuniAPI;
-
   loadedIds: string[] = [];
 
+  scriptListNode: HTMLDivElement;
+
   storageKeys = {
-    ScriptManager: {
-      code: 'huzuni-overlay.script-manager.code',
-      scripts: 'huzuni-overlay.script-manager.scripts',
-    },
+    code: 'huzuni-overlay.script-manager.code',
+    scripts: 'huzuni-overlay.script-manager.scripts',
   };
+
+  constructor(api: HuzuniAPI) {
+    this.api = api;
+
+    this.setupScriptManagerUI();
+    this.checkScriptStorage();
+  }
 
   getScriptMetadata(code: string): {
     errors: string[];
@@ -97,13 +104,10 @@ export default class HuzuniOverlay implements HuzuniScript {
   } {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let scriptsStore: string | { [index: string]: any } = localStorage.getItem(
-      this.storageKeys.ScriptManager.scripts,
+      this.storageKeys.scripts,
     );
     if (scriptsStore == undefined) {
-      localStorage.setItem(
-        this.storageKeys.ScriptManager.scripts,
-        JSON.stringify({}),
-      );
+      localStorage.setItem(this.storageKeys.scripts, JSON.stringify({}));
       scriptsStore = {};
     } else {
       scriptsStore = JSON.parse(scriptsStore);
@@ -111,6 +115,32 @@ export default class HuzuniOverlay implements HuzuniScript {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return scriptsStore as any;
+  }
+
+  getScriptListElement(
+    name: string,
+    description: string,
+    author: string,
+  ): HTMLDivElement {
+    const root = document.createElement('div');
+    root.style.display = 'flex';
+    root.style.width = '100%';
+    root.style.justifyContent = 'space-between';
+    root.style.padding = '4px';
+    root.style.boxSizing = 'border-box';
+
+    root.innerHTML = `
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-weight: bold;">${name}</span>
+        <span style="font-size: smaller;">${description} ; made by ${author}</span>
+      </div>
+      <div style="display: flex">
+        <input type="checkbox" style="margin-right: 8px" class="disable" />
+        <button style="background-color: var(--color-error); color: white;" class="delete">DELETE</button>
+      </div>
+    `;
+
+    return root;
   }
 
   checkScriptStorage() {
@@ -139,10 +169,31 @@ export default class HuzuniOverlay implements HuzuniScript {
       console.log(`[huzuni-overlay] loaded!`);
     }
 
-    localStorage.setItem(
-      this.storageKeys.ScriptManager.scripts,
-      JSON.stringify(store),
-    );
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
+
+    for (const id of Object.keys(store)) {
+      const script = store[id];
+      const node = this.getScriptListElement(
+        script.metadata.name,
+        script.metadata.description,
+        script.metadata.author,
+      );
+      node.querySelector('.delete').addEventListener('click', () => {
+        this.removeScript(id);
+        node.remove();
+      });
+      (node.querySelector('.disable') as HTMLInputElement).checked =
+        store[id].enabled;
+      node.querySelector('.disable').addEventListener('change', () => {
+        if ((node.querySelector('.disable') as HTMLInputElement).checked) {
+          if (store[id].enabled) return;
+          this.enableScript(id);
+        } else {
+          this.disableScript(id);
+        }
+      });
+      this.scriptListNode.appendChild(node);
+    }
   }
 
   addScript(metadata: ScriptMetadata, code: string): boolean {
@@ -160,10 +211,46 @@ export default class HuzuniOverlay implements HuzuniScript {
     };
 
     localStorage.setItem(
-      this.storageKeys.ScriptManager.scripts,
+      this.storageKeys.scripts,
       JSON.stringify(scriptsStore),
     );
     return true;
+  }
+
+  removeScript(id: string) {
+    this.disableScript(id);
+
+    const store = this.getScriptsStore();
+    delete store[id];
+
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
+  }
+
+  enableScript(id: string): boolean {
+    const store = this.getScriptsStore();
+    store[id].enabled = true;
+
+    try {
+      this.api.scriptManager.enableScript(id);
+    } catch (error) {
+      store[id].enabled = false;
+      console.error(
+        `[huzuni-overlay] [${id}] fatal error while enabling:`,
+        error,
+      );
+    }
+
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
+
+    return true;
+  }
+  disableScript(id: string) {
+    const store = this.getScriptsStore();
+    store[id].enabled = false;
+
+    this.api.scriptManager.disableScript(id);
+
+    localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
   }
 
   createCodeEditor() {
@@ -175,10 +262,7 @@ export default class HuzuniOverlay implements HuzuniScript {
     root.style['marginTop'] = '6px';
 
     rkgkCodeEditor.addEventListener('.codeChanged', () => {
-      localStorage.setItem(
-        this.storageKeys.ScriptManager.code,
-        rkgkCodeEditor.code,
-      );
+      localStorage.setItem(this.storageKeys.code, rkgkCodeEditor.code);
     });
 
     // Error listing
@@ -218,6 +302,7 @@ export default class HuzuniOverlay implements HuzuniScript {
       }
 
       rkgkCodeEditor.setCode('');
+      errors.textContent = 'added script!';
 
       this.checkScriptStorage();
     });
@@ -229,10 +314,8 @@ export default class HuzuniOverlay implements HuzuniScript {
     return {
       root,
       finish: () => {
-        if (localStorage.getItem(this.storageKeys.ScriptManager.code)) {
-          rkgkCodeEditor.setCode(
-            localStorage.getItem(this.storageKeys.ScriptManager.code),
-          );
+        if (localStorage.getItem(this.storageKeys.code)) {
+          rkgkCodeEditor.setCode(localStorage.getItem(this.storageKeys.code));
         }
       },
     };
@@ -246,13 +329,50 @@ export default class HuzuniOverlay implements HuzuniScript {
     `;
 
     const codeEditor = this.createCodeEditor();
-    const c2 = document.createElement('div');
-    c2.innerText = 'Script List';
+    this.scriptListNode = document.createElement('div');
+
+    this.scriptListNode.style.display = 'flex';
+    this.scriptListNode.style.flexDirection = 'column';
+    this.scriptListNode.style.maxHeight = '300px';
+    this.scriptListNode.style.overflowY = 'auto';
+    this.scriptListNode.style.width = '100%';
+    this.scriptListNode.style.boxSizing = 'border-box';
+
+    for (const script of huzuni_scriptManager.scripts) {
+      const node = this.getScriptListElement(
+        script[0],
+        'huzuni internal script',
+        'huzuni',
+      );
+      node.querySelector('.delete').remove();
+      (node.querySelector('.disable') as HTMLInputElement).checked =
+        script[1].enabled;
+
+      node.querySelector('.disable').addEventListener('change', () => {
+        if ((node.querySelector('.disable') as HTMLInputElement).checked) {
+          localStorage.removeItem(
+            `huzuni.internal-script.${script[0]}.disabled`,
+          );
+          this.api.scriptManager.enableScript(script[0]);
+        } else {
+          localStorage.setItem(
+            `huzuni.internal-script.${script[0]}.disabled`,
+            'yes',
+          );
+          this.api.scriptManager.disableScript(script[0]);
+        }
+      });
+
+      if (!script[1].canBeDisabled)
+        (node.querySelector('.disable') as HTMLInputElement).disabled = true;
+
+      this.scriptListNode.appendChild(node);
+    }
 
     scriptManagerUI.appendChild(
       this.api.huzuniUI.tabs(
         ['Code Editor', 'Script List'],
-        [codeEditor.root, c2],
+        [codeEditor.root, this.scriptListNode],
       ),
     );
 
@@ -260,6 +380,13 @@ export default class HuzuniOverlay implements HuzuniScript {
 
     codeEditor.finish();
   }
+}
+
+export default class HuzuniOverlay implements HuzuniScript {
+  api: HuzuniAPI;
+  scriptManager: ScriptManager;
+
+  storageKeys = {};
 
   setupHuzuniMenuBar() {
     const huzuniButton = document.createElement('div');
@@ -283,9 +410,7 @@ export default class HuzuniOverlay implements HuzuniScript {
     this.api = api;
 
     this.setupHuzuniMenuBar();
-    this.setupScriptManagerUI();
-
-    this.checkScriptStorage();
+    this.scriptManager = new ScriptManager(api);
   }
   stop(): void {}
 }

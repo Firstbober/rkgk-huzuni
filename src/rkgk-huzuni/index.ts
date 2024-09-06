@@ -74,8 +74,13 @@ document.addEventListener('DOMContentLoaded', () => {
       huzuniUI.setupCSS();
       artworkProtocol.setupListeners();
 
-      scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay());
       scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());
+      // Always must be last
+      scriptManager.registerScript(
+        'Huzuni Overlay',
+        new HuzuniOverlay(),
+        false,
+      );
     }
   })();
 });

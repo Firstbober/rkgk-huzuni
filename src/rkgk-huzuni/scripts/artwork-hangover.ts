@@ -4,6 +4,8 @@ import { rkgkInternals } from '../modules/rkgk-internals';
 export default class ArtworkHangover implements HuzuniScript {
   api: HuzuniAPI;
 
+  chatElement: HTMLElement;
+
   start(api: HuzuniAPI): void {
     this.api = api;
 
@@ -53,6 +55,7 @@ export default class ArtworkHangover implements HuzuniScript {
 
     // Handle artwork messages
     api.artworkProtocol.events.message = (sessionId, json) => {
+      if (!api.enabled) return;
       if (json.type != 'chatMessage') return;
 
       const message = document.createElement('span');
@@ -65,7 +68,10 @@ export default class ArtworkHangover implements HuzuniScript {
       });
     };
 
+    this.chatElement = chat;
     document.getElementsByTagName('main')[0].appendChild(chat);
   }
-  stop(): void {}
+  stop(): void {
+    this.chatElement.remove();
+  }
 }
