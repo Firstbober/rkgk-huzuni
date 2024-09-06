@@ -18,8 +18,12 @@ function bytesToBase64(bytes) {
   return btoa(binString);
 }
 
-export const artworkProtocol = {
-  ARTWORK_MESSAGE_PREFIX: '-- ARTWORK ',
+class ArtworkProtocol {
+  ARTWORK_MESSAGE_PREFIX = '-- ARTWORK ';
+
+  test() {
+    return document.querySelector('rkgk-brush-editor') != undefined;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   encodeArtworkMessage(message: any): string {
@@ -27,12 +31,12 @@ export const artworkProtocol = {
       new TextEncoder().encode(JSON.stringify(message)),
     );
     return encoded;
-  },
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   decodeArtworkMessage(message): any {
     return JSON.parse(new TextDecoder().decode(base64ToBytes(message)));
-  },
+  }
 
   setupListeners() {
     console.log(`[huzuni] [artwork-protocol] setting up listeners`);
@@ -41,19 +45,15 @@ export const artworkProtocol = {
       if (wallEvent.kind.event != 'setBrush') return;
       const brush: string = wallEvent.kind.brush;
 
-      if (!brush.startsWith(artworkProtocol.ARTWORK_MESSAGE_PREFIX)) return;
+      if (!brush.startsWith(this.ARTWORK_MESSAGE_PREFIX)) return;
 
-      const message = artworkProtocol.decodeArtworkMessage(
-        brush.slice(artworkProtocol.ARTWORK_MESSAGE_PREFIX.length),
+      const message = this.decodeArtworkMessage(
+        brush.slice(this.ARTWORK_MESSAGE_PREFIX.length),
       );
 
-      artworkProtocol.events.message(wallEvent.sessionId, message);
+      this.events.message(wallEvent.sessionId, message);
     };
-  },
-
-  test() {
-    return document.querySelector('rkgk-brush-editor') != undefined;
-  },
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendBroadcastMessage(data: any) {
@@ -64,15 +64,17 @@ export const artworkProtocol = {
     ).code;
 
     rkgkInternals.sendSetBrush(
-      `${artworkProtocol.ARTWORK_MESSAGE_PREFIX}${artworkProtocol.encodeArtworkMessage(data)}`,
+      `${this.ARTWORK_MESSAGE_PREFIX}${this.encodeArtworkMessage(data)}`,
     );
     rkgkInternals.sendSetBrush(currentCode);
-  },
+  }
 
-  events: new Proxy(
+  events = new Proxy(
     {
       message() {},
     } as ArtworkEventHandler,
     new MixinHandler<ArtworkEventHandler>(),
-  ),
-};
+  );
+}
+
+export const artworkProtocol = new ArtworkProtocol();

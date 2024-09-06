@@ -11,9 +11,9 @@ export interface SessionEventHandlers {
   }): void;
 }
 
-export const rkgkInternals = {
-  session: {} as rkgk_session.Session,
-  currentUserId: 0,
+class RkGkInternals {
+  session = {} as rkgk_session.Session;
+  currentUserId = 0;
 
   async handleRkGkImports(body, name: string, path: string, imported: boolean) {
     if (imported) {
@@ -28,7 +28,7 @@ export const rkgkInternals = {
 
     try {
       const body = await import(`${path}`);
-      rkgkInternals.handleRkGkImports(body, name, path, true);
+      this.handleRkGkImports(body, name, path, true);
       return true;
     } catch (error) {
       console.error(
@@ -36,30 +36,30 @@ export const rkgkInternals = {
       );
       return false;
     }
-  },
+  }
 
   async importRkgkInternals() {
     let result = true;
 
-    result &&= await rkgkInternals.handleRkGkImports(
+    result &&= await this.handleRkGkImports(
       null,
       'wall',
       'rkgk/wall.js',
       false,
     );
-    result &&= await rkgkInternals.handleRkGkImports(
+    result &&= await this.handleRkGkImports(
       null,
       'session',
       'rkgk/session.js',
       false,
     );
-    result &&= await rkgkInternals.handleRkGkImports(
+    result &&= await this.handleRkGkImports(
       null,
       'framework',
       'rkgk/framework.js',
       false,
     );
-    result &&= await rkgkInternals.handleRkGkImports(
+    result &&= await this.handleRkGkImports(
       null,
       'reticle_renderer',
       'rkgk/reticle-renderer.js',
@@ -67,7 +67,7 @@ export const rkgkInternals = {
     );
 
     return result;
-  },
+  }
 
   insertNewIndex() {
     const oldQuerySelector = document.querySelector;
@@ -75,12 +75,12 @@ export const rkgkInternals = {
       if (value != 'main') return oldQuerySelector.apply(document, [value]);
       setTimeout(async () => {
         document.querySelector = oldQuerySelector;
-        await rkgkInternals.importRkgkInternals();
-        await rkgkInternals.hijackIndex();
+        await this.importRkgkInternals();
+        await this.hijackIndex();
       }, 1);
       throw Error('[huzuni] got em');
     };
-  },
+  }
 
   async hijackIndex() {
     console.info('[huzuni] [rkgk-internals] starting hijacking of index.js...');
@@ -123,58 +123,61 @@ export const rkgkInternals = {
       newSession: async (
         values: Parameters<typeof rkgk_session.newSession>[0],
       ) => {
-        rkgkInternals.session = await rkgk_session.newSession(values);
-        rkgkInternals.setupListeners();
-        return rkgkInternals.session;
+        this.session = await rkgk_session.newSession(values);
+        this.setupListeners();
+        return this.session;
       },
     };
 
     eval(newCode);
 
     return true;
-  },
+  }
 
   async test() {
     return true;
-  },
+  }
 
   setupListeners() {
-    rkgkInternals.session.addEventListener('wallEvent', (ev) => {
-      rkgkInternals.events.wall((ev as never)['wallEvent']);
+    this.session.addEventListener('wallEvent', (ev) => {
+      this.events.wall((ev as never)['wallEvent']);
     });
 
-    rkgkInternals.events.wall = (wallEvent) => {
+    this.events.wall = (wallEvent) => {
+      // Update Session object
       if (wallEvent.kind.event == 'join') {
-        rkgkInternals.session.wallInfo.online.push({
+        this.session.wallInfo.online.push({
           sessionId: wallEvent.sessionId,
           brush: wallEvent.kind.init.brush,
           nickname: wallEvent.kind.nickname,
         });
       } else if (wallEvent.kind.event == 'leave') {
-        for (let i = 0; i < rkgkInternals.session.wallInfo.online.length; i++) {
-          const user = rkgkInternals.session.wallInfo.online[i];
+        for (let i = 0; i < this.session.wallInfo.online.length; i++) {
+          const user = this.session.wallInfo.online[i];
           if (user.sessionId == wallEvent.sessionId)
-            rkgkInternals.session.wallInfo.online.splice(i, 1);
+            this.session.wallInfo.online.splice(i, 1);
         }
       }
     };
-  },
+  }
 
   sendSetBrush(brush: string) {
-    rkgkInternals.session.sendSetBrush(brush);
-  },
+    this.session.sendSetBrush(brush);
+  }
 
   getUsernameBySessionId(sessionId: number): string {
-    for (const user of rkgkInternals.session.wallInfo.online) {
+    for (const user of this.session.wallInfo.online) {
       if (user.sessionId == sessionId) return user.nickname;
     }
     return undefined;
-  },
+  }
 
-  events: new Proxy(
+  events = new Proxy(
     {
       wall() {},
     } as SessionEventHandlers,
     new MixinHandler<SessionEventHandlers>(),
-  ),
-};
+  );
+}
+
+export const rkgkInternals = new RkGkInternals();

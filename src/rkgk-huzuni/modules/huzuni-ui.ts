@@ -1,4 +1,4 @@
-export const huzuniUI = {
+class HuzuniUI {
   tabs(labels: string[], content: HTMLDivElement[]): HTMLDivElement {
     const uiTabs = document.createElement('div');
     uiTabs.classList.add('huzuni-ui-tabs');
@@ -44,5 +44,7 @@ export const huzuniUI = {
     uiTabsButtons[0].classList.add('active');
 
     return uiTabs;
-  },
-};
+  }
+}
+
+export const huzuniUI = new HuzuniUI();
