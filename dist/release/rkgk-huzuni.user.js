@@ -13,52 +13,54 @@
 (function () {
 'use strict';
 
-var css_248z = ".huzuni-ui-tabs{border:1px solid var(--color-panel-border)}.huzuni-ui-tabs>div:first-child{border-bottom:1px solid var(--color-panel-border)}.huzuni-ui-tabs>div:first-child span{cursor:pointer;padding:2px 6px}.huzuni-ui-tabs>div:first-child span:hover{background-color:var(--color-shaded-background)}.huzuni-ui-tabs>div:first-child span.active{background-color:var(--color-panel-border)}";
-
-const topPanel = {
+class TopPanel {
+  test() {
+    return this.getPanelElement() != undefined;
+  }
   getPanelElement() {
     return document.querySelectorAll('#panels-overlay .rkgk-panel')[0];
-  },
-  test() {
-    return topPanel.getPanelElement() != undefined;
-  },
+  }
+
   // Appends HTML element at the start of the panel
   appendStart(element, href) {
-    const panelElement = topPanel.getPanelElement();
+    const panelElement = this.getPanelElement();
     const a = document.createElement('a');
     a.appendChild(element);
     if (href) a.href = href;
     panelElement.insertBefore(document.createElement('hr'), panelElement.firstChild);
     panelElement.insertBefore(a, panelElement.firstChild);
-  },
+  }
+
   // Appends HTML element at the end of the panel
   appendEnd(element, href) {
-    const panelElement = topPanel.getPanelElement();
+    const panelElement = this.getPanelElement();
     const a = new HTMLAnchorElement();
     a.appendChild(element);
     if (href) a.href = href;
     panelElement.appendChild(document.createElement('hr'));
     panelElement.appendChild(element);
   }
-};
-const rightPanel = {
+}
+class RightPanel {
+  test() {
+    if (this.getPanelElement() == undefined) return false;
+    this.getPanelElement().style['flexWrap'] = 'wrap';
+    return true;
+  }
   getPanelElement() {
     return document.querySelectorAll('div#panels-overlay.panels.fullscreen div.right')[0];
-  },
-  test() {
-    if (rightPanel.getPanelElement() == undefined) return false;
-    rightPanel.getPanelElement().style['flexWrap'] = 'wrap';
-    return true;
-  },
+  }
   appendEnd(element) {
-    const panel = rightPanel.getPanelElement();
+    const panel = this.getPanelElement();
     element.style['marginLeft'] += '16px';
     element.style['width'] += '100%';
     element.style['marginTop'] += '8px';
     element.classList.add('rkgk-panel');
     panel.appendChild(element);
   }
-};
+}
+const topPanel = new TopPanel();
+const rightPanel = new RightPanel();
 
 class MixinHandler {
   constructor() {
@@ -95,9 +97,14 @@ class MixinHandler {
   }
 }
 
-const rkgkInternals = {
-  session: {},
-  currentUserId: 0,
+class RkGkInternals {
+  constructor() {
+    this.session = {};
+    this.currentUserId = 0;
+    this.events = new Proxy({
+      wall() {}
+    }, new MixinHandler());
+  }
   async handleRkGkImports(body, name, path, imported) {
     if (imported) {
       console.info(`[huzuni] [rkgk-internals] imported "rkgk_${name}"!`);
@@ -107,33 +114,37 @@ const rkgkInternals = {
     console.info(`[huzuni] [rkgk-internals] importing module "rkgk_${name}" with path "${path}"...`);
     try {
       const body = await import(`${path}`);
-      rkgkInternals.handleRkGkImports(body, name, path, true);
+      await this.handleRkGkImports(body, name, path, true);
       return true;
     } catch (error) {
       console.error(`[huzuni] [rkgk-internals] importing module "rkgk_${name}" with path "${path}" failed!`);
       return false;
     }
-  },
+  }
   async importRkgkInternals() {
     let result = true;
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'wall', 'rkgk/wall.js', false));
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'session', 'rkgk/session.js', false));
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'framework', 'rkgk/framework.js', false));
-    result && (result = await rkgkInternals.handleRkGkImports(null, 'reticle_renderer', 'rkgk/reticle-renderer.js', false));
+    result && (result = await this.handleRkGkImports(null, 'wall', 'rkgk/wall.js', false));
+    result && (result = await this.handleRkGkImports(null, 'session', 'rkgk/session.js', false));
+    result && (result = await this.handleRkGkImports(null, 'framework', 'rkgk/framework.js', false));
+    result && (result = await this.handleRkGkImports(null, 'reticle_renderer', 'rkgk/reticle-renderer.js', false));
+    result && (result = await this.handleRkGkImports(null, 'code_editor', 'rkgk/code-editor.js', false));
     return result;
-  },
+  }
   insertNewIndex() {
-    const oldQuerySelector = document.querySelector;
-    document.querySelector = value => {
-      if (value != 'main') return oldQuerySelector.apply(document, [value]);
-      setTimeout(async () => {
-        document.querySelector = oldQuerySelector;
-        await rkgkInternals.importRkgkInternals();
-        await rkgkInternals.hijackIndex();
-      }, 1);
-      throw Error('[huzuni] got em');
-    };
-  },
+    return new Promise(resolve => {
+      const oldQuerySelector = document.querySelector;
+      document.querySelector = value => {
+        if (value != 'main') return oldQuerySelector.apply(document, [value]);
+        setTimeout(async () => {
+          document.querySelector = oldQuerySelector;
+          await this.importRkgkInternals();
+          resolve();
+          await this.hijackIndex();
+        }, 1);
+        throw Error('[huzuni] got em');
+      };
+    });
+  }
   async hijackIndex() {
     console.info('[huzuni] [rkgk-internals] starting hijacking of index.js...');
     const code = await (await fetch('static/index.js')).text();
@@ -165,49 +176,48 @@ const rkgkInternals = {
     ` + newCode;
     globalThis.huzuni.rkgk_overrides = {
       newSession: async values => {
-        rkgkInternals.session = await rkgk_session.newSession(values);
-        rkgkInternals.setupListeners();
-        return rkgkInternals.session;
+        this.session = await rkgk_session.newSession(values);
+        this.setupListeners();
+        return this.session;
       }
     };
     eval(newCode);
     return true;
-  },
+  }
   async test() {
     return true;
-  },
+  }
   setupListeners() {
-    rkgkInternals.session.addEventListener('wallEvent', ev => {
-      rkgkInternals.events.wall(ev['wallEvent']);
+    this.session.addEventListener('wallEvent', ev => {
+      this.events.wall(ev['wallEvent']);
     });
-    rkgkInternals.events.wall = wallEvent => {
+    this.events.wall = wallEvent => {
+      // Update Session object
       if (wallEvent.kind.event == 'join') {
-        rkgkInternals.session.wallInfo.online.push({
+        this.session.wallInfo.online.push({
           sessionId: wallEvent.sessionId,
           brush: wallEvent.kind.init.brush,
           nickname: wallEvent.kind.nickname
         });
       } else if (wallEvent.kind.event == 'leave') {
-        for (let i = 0; i < rkgkInternals.session.wallInfo.online.length; i++) {
-          const user = rkgkInternals.session.wallInfo.online[i];
-          if (user.sessionId == wallEvent.sessionId) rkgkInternals.session.wallInfo.online.splice(i, 1);
+        for (let i = 0; i < this.session.wallInfo.online.length; i++) {
+          const user = this.session.wallInfo.online[i];
+          if (user.sessionId == wallEvent.sessionId) this.session.wallInfo.online.splice(i, 1);
         }
       }
     };
-  },
+  }
   sendSetBrush(brush) {
-    rkgkInternals.session.sendSetBrush(brush);
-  },
+    this.session.sendSetBrush(brush);
+  }
   getUsernameBySessionId(sessionId) {
-    for (const user of rkgkInternals.session.wallInfo.online) {
+    for (const user of this.session.wallInfo.online) {
       if (user.sessionId == sessionId) return user.nickname;
     }
     return undefined;
-  },
-  events: new Proxy({
-    wall() {}
-  }, new MixinHandler())
-};
+  }
+}
+const rkgkInternals = new RkGkInternals();
 
 function base64ToBytes(base64) {
   const binString = atob(base64);
@@ -217,42 +227,57 @@ function bytesToBase64(bytes) {
   const binString = Array.from(bytes, byte => String.fromCodePoint(byte)).join('');
   return btoa(binString);
 }
-const artworkProtocol = {
-  ARTWORK_MESSAGE_PREFIX: '-- ARTWORK ',
+class ArtworkProtocol {
+  constructor() {
+    this.ARTWORK_MESSAGE_PREFIX = '-- ARTWORK ';
+    this.events = new Proxy({
+      message() {}
+    }, new MixinHandler());
+  }
+  test() {
+    return document.querySelector('rkgk-brush-editor') != undefined;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   encodeArtworkMessage(message) {
     const encoded = bytesToBase64(new TextEncoder().encode(JSON.stringify(message)));
     return encoded;
-  },
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   decodeArtworkMessage(message) {
     return JSON.parse(new TextDecoder().decode(base64ToBytes(message)));
-  },
+  }
   setupListeners() {
     console.log(`[huzuni] [artwork-protocol] setting up listeners`);
     rkgkInternals.events.wall = wallEvent => {
       if (wallEvent.kind.event != 'setBrush') return;
       const brush = wallEvent.kind.brush;
-      if (!brush.startsWith(artworkProtocol.ARTWORK_MESSAGE_PREFIX)) return;
-      const message = artworkProtocol.decodeArtworkMessage(brush.slice(artworkProtocol.ARTWORK_MESSAGE_PREFIX.length));
-      artworkProtocol.events.message(wallEvent.sessionId, message);
+      if (!brush.startsWith(this.ARTWORK_MESSAGE_PREFIX)) return;
+      const message = this.decodeArtworkMessage(brush.slice(this.ARTWORK_MESSAGE_PREFIX.length));
+      this.events.message(wallEvent.sessionId, message);
     };
-  },
-  test() {
-    return document.querySelector('rkgk-brush-editor') != undefined;
-  },
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendBroadcastMessage(data) {
     const currentCode = document.querySelector('rkgk-brush-editor').code;
-    rkgkInternals.sendSetBrush(`${artworkProtocol.ARTWORK_MESSAGE_PREFIX}${artworkProtocol.encodeArtworkMessage(data)}`);
+    rkgkInternals.sendSetBrush(`${this.ARTWORK_MESSAGE_PREFIX}${this.encodeArtworkMessage(data)}`);
     rkgkInternals.sendSetBrush(currentCode);
-  },
-  events: new Proxy({
-    message() {}
-  }, new MixinHandler())
-};
+  }
+}
+const artworkProtocol = new ArtworkProtocol();
 
-const huzuniUI = {
+var css_248z$1 = ".huzuni-ui-tabs{border:1px solid var(--color-panel-border);display:flex;flex-direction:column}.huzuni-ui-tabs>div:first-child{border-bottom:1px solid var(--color-panel-border);display:flex}.huzuni-ui-tabs>div:first-child span{cursor:pointer;padding:4px 6px}.huzuni-ui-tabs>div:first-child span:hover{background-color:var(--color-shaded-background)}.huzuni-ui-tabs>div:first-child span.active{background-color:var(--color-panel-border)}";
+
+var css_248z = "button{cursor:pointer}button:hover{background-color:var(--color-shaded-background)}";
+
+class HuzuniUI {
+  setupCSS() {
+    const style = document.createElement('style');
+    style.textContent = [css_248z$1, css_248z].join('\n');
+    document.body.appendChild(style);
+  }
   tabs(labels, content) {
     const uiTabs = document.createElement('div');
     uiTabs.classList.add('huzuni-ui-tabs');
@@ -265,7 +290,11 @@ const huzuniUI = {
     uiTabs.appendChild(uiTabsButtonsContainer);
     const uiTabsContainer = document.createElement('div');
     uiTabsContainer.classList.add('huzuni-ui-tabs-container');
-    uiTabsContainer.append(...content);
+    uiTabsContainer.append(...content.map(e => {
+      const d = document.createElement('div');
+      d.appendChild(e);
+      return d;
+    }));
     uiTabs.appendChild(uiTabsContainer);
     const uiTabsButtons = uiTabs.querySelectorAll('div:first-child>span');
     const uiTabsContent = uiTabs.querySelectorAll('.huzuni-ui-tabs-container>*');
@@ -287,80 +316,256 @@ const huzuniUI = {
     uiTabsButtons[0].classList.add('active');
     return uiTabs;
   }
-};
+}
+const huzuniUI = new HuzuniUI();
 
 class HuzuniAPI {
   constructor() {
     this.topPanel = topPanel;
     this.rightPanel = rightPanel;
     this.huzuniUI = huzuniUI;
+    this.rkgkInternals = rkgkInternals;
     this.artworkProtocol = artworkProtocol;
+    this.scriptManager = scriptManager;
   }
 }
 
-const scriptManager = {
-  scripts: new Map(),
+class ScriptManager {
+  constructor() {
+    this.scripts = new Map();
+  }
   test() {
     return true;
-  },
+  }
   registerScript(name, script) {
-    if (scriptManager.scripts.has(name)) {
+    if (this.scripts.has(name)) {
       console.error(`[huzuni] [script-manager] cannot load another script with name "${name}"`);
-      return;
+      return false;
     }
     console.log(`[huzuni] [script-manager] registered new script "${name}"`);
-    scriptManager.scripts.set(name, script);
-    scriptManager.enableScript(name);
-  },
+    this.scripts.set(name, script);
+    this.enableScript(name);
+    return true;
+  }
   enableScript(name) {
-    if (!scriptManager.scripts.has(name)) {
+    if (!this.scripts.has(name)) {
       console.warn(`[huzuni] [script-manager] cannot enable non-existent script "${name}"`);
       return;
     }
     console.log(`[huzuni] [script-manager] enabled script "${name}"`);
     const api = new HuzuniAPI();
-    scriptManager.scripts.get(name).start(api);
-  },
+    this.scripts.get(name).start(api);
+  }
   disableScript(name) {
-    if (!scriptManager.scripts.has(name)) {
+    if (!this.scripts.has(name)) {
       console.warn(`[huzuni] [script-manager] cannot disable non-existent script "${name}"`);
       return;
     }
     console.log(`[huzuni] [script-manager] disabled script "${name}"`);
-    scriptManager.scripts.get(name).stop();
+    this.scripts.get(name).stop();
   }
-};
+}
+const scriptManager = new ScriptManager();
+
+/*
+// ==Huzuni Script==
+// @name Keylogger
+// @author Firstbober
+// @description Keylogger for your keyboard
+// ==Huzuni Script==
+
+class Something {
+  start(api) {
+    api.artworkProtocol.events.message = (sessionId, json) => {
+      console.log(`Something got artwork messsge with sid ${sessionId} and data ${json}`);
+    }
+  }
+  stop() {
+  }
+}
+
+return Something;
+*/
 
 class HuzuniOverlay {
+  constructor() {
+    this.loadedIds = [];
+    this.storageKeys = {
+      ScriptManager: {
+        code: 'huzuni-overlay.script-manager.code',
+        scripts: 'huzuni-overlay.script-manager.scripts'
+      }
+    };
+  }
+  getScriptMetadata(code) {
+    let splitted = code.split('==Huzuni Script==');
+    if (splitted.length < 3) return {
+      errors: ['metadata is missing']
+    };
+    const metadata = {
+      name: null,
+      author: null,
+      description: null
+    };
+    splitted = splitted[1].split('//');
+    for (let i = 1; i < splitted.length - 1; i++) {
+      const element = splitted[i].trim();
+      if (element.startsWith('@name ')) {
+        metadata.name = element.slice('@name '.length);
+      }
+      if (element.startsWith('@author ')) {
+        metadata.author = element.slice('@author '.length);
+      }
+      if (element.startsWith('@description ')) {
+        metadata.description = element.slice('@description '.length);
+      }
+    }
+    const errors = [];
+    if (metadata.name == null) errors.push('name is missing from metadata');
+    if (metadata.author == null) errors.push('author is missing from metadata');
+    if (metadata.description == null) errors.push('description is missing from metadata');
+    if (errors.length > 0) return {
+      errors
+    };
+    return {
+      errors: [],
+      metadata
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getScriptsStore() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let scriptsStore = localStorage.getItem(this.storageKeys.ScriptManager.scripts);
+    if (scriptsStore == undefined) {
+      localStorage.setItem(this.storageKeys.ScriptManager.scripts, JSON.stringify({}));
+      scriptsStore = {};
+    } else {
+      scriptsStore = JSON.parse(scriptsStore);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return scriptsStore;
+  }
+  checkScriptStorage() {
+    const store = this.getScriptsStore();
+    const difference = Object.keys(store).sort().filter(x => !this.loadedIds.includes(x));
+    for (const id of difference) {
+      const script = store[id];
+      if (!script.enabled) continue;
+      console.log(`[huzuni-overlay] loading script "${script.metadata.name}" by "${script.metadata.author}"...`);
+      try {
+        store[id].enabled = this.api.scriptManager.registerScript(id, new (new Function(script.code)())());
+      } catch (error) {
+        console.error(`[huzuni-overlay] [${id}] fatal error:`, error);
+        continue;
+      }
+      console.log(`[huzuni-overlay] loaded!`);
+    }
+    localStorage.setItem(this.storageKeys.ScriptManager.scripts, JSON.stringify(store));
+  }
+  addScript(metadata, code) {
+    const scriptsStore = this.getScriptsStore();
+    const getScriptId = `${metadata.name}.${metadata.author}`;
+    if (scriptsStore[getScriptId] != undefined) {
+      return false;
+    }
+    scriptsStore[getScriptId] = {
+      metadata,
+      code,
+      enabled: true
+    };
+    localStorage.setItem(this.storageKeys.ScriptManager.scripts, JSON.stringify(scriptsStore));
+    return true;
+  }
+  createCodeEditor() {
+    const root = document.createElement('div');
+
+    // Editor
+    const rkgkCodeEditor = new rkgk_code_editor.CodeEditor();
+    root.appendChild(rkgkCodeEditor);
+    root.style['marginTop'] = '6px';
+    rkgkCodeEditor.addEventListener('.codeChanged', () => {
+      localStorage.setItem(this.storageKeys.ScriptManager.code, rkgkCodeEditor.code);
+    });
+
+    // Error listing
+    const errors = document.createElement('pre');
+    errors.style['color'] = 'var(--color-error)';
+    errors.style['whiteSpace'] = 'pre-wrap';
+    errors.style['marginLeft'] = '16px';
+    root.appendChild(errors);
+
+    // Operation buttons
+    const buttons = document.createElement('div');
+    buttons.style['paddingLeft'] = '6px';
+    buttons.style['paddingBottom'] = '6px';
+    buttons.innerHTML = `
+      <button class="save">Save</button>
+      <button class="clear" style="background-color: var(--color-error); color: white;">Clear</button>
+    `;
+    buttons.style['marginTop'] = '18px';
+    root.appendChild(buttons);
+
+    // Event handlers on buttons
+    buttons.querySelector('.save').addEventListener('click', () => {
+      errors.textContent = '';
+      const metadata = this.getScriptMetadata(rkgkCodeEditor.code);
+      if (metadata.errors.length > 0) {
+        errors.textContent = metadata.errors.join('\n');
+        return;
+      }
+      if (!this.addScript(metadata.metadata, rkgkCodeEditor.code)) {
+        errors.textContent = `script with name "${metadata.metadata.name}" and author "${metadata.metadata.author}" is already there`;
+        return;
+      }
+      rkgkCodeEditor.setCode('');
+      this.checkScriptStorage();
+    });
+    buttons.querySelector('.clear').addEventListener('click', () => {
+      rkgkCodeEditor.setCode('');
+    });
+
+    // Finalize
+    return {
+      root,
+      finish: () => {
+        if (localStorage.getItem(this.storageKeys.ScriptManager.code)) {
+          rkgkCodeEditor.setCode(localStorage.getItem(this.storageKeys.ScriptManager.code));
+        }
+      }
+    };
+  }
   setupScriptManagerUI() {
     const scriptManagerUI = document.createElement('div');
     scriptManagerUI.style['padding'] = '8px';
     scriptManagerUI.innerHTML = `
       <span style="font-size: medium;">Script Manager</span>
     `;
-    const c1 = document.createElement('div');
-    c1.innerText = 'Code Editor';
+    const codeEditor = this.createCodeEditor();
     const c2 = document.createElement('div');
     c2.innerText = 'Script List';
-    scriptManagerUI.appendChild(this.api.huzuniUI.tabs(['Code Editor', 'Script List'], [c1, c2]));
+    scriptManagerUI.appendChild(this.api.huzuniUI.tabs(['Code Editor', 'Script List'], [codeEditor.root, c2]));
     this.api.rightPanel.appendEnd(scriptManagerUI);
+    codeEditor.finish();
   }
   setupHuzuniMenuBar() {
-    const text = document.createElement('span');
-    text.innerText = 'huzuni';
-    this.api.topPanel.appendStart(text, 'https://github.com/Firstbober/rkgk-huzuni');
-    const img = document.createElement('img');
-    img.src = 'https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png';
-    img.style['width'] = '16px';
-    img.style['height'] = '16px';
-    this.api.topPanel.appendStart(img, 'https://github.com/Firstbober/rkgk-huzuni');
-    img.parentElement.style['paddingLeft'] = '4px';
-    img.parentElement.style['paddingRight'] = '4px';
+    const huzuniButton = document.createElement('div');
+    huzuniButton.innerHTML = `
+      <img src="https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png" width="16" height="16"
+        style="margin-right: 4px;" />
+      <span>huzuni</span>
+    `;
+    huzuniButton.style['display'] = 'flex';
+    this.api.topPanel.appendStart(huzuniButton, 'https://github.com/Firstbober/rkgk-huzuni');
+    huzuniButton.parentElement.style['paddingLeft'] = '4px';
+    huzuniButton.parentElement.style['paddingRight'] = '4px';
   }
   start(api) {
     this.api = api;
     this.setupHuzuniMenuBar();
     this.setupScriptManagerUI();
+    this.checkScriptStorage();
   }
   stop() {}
 }
@@ -428,7 +633,7 @@ class ArtworkHangover {
 // BEFORE DOM IS LOADED
 //
 
-rkgkInternals.insertNewIndex();
+const indexHijackPromise = rkgkInternals.insertNewIndex();
 
 // Create namespace for further use
 globalThis.huzuni = {};
@@ -463,18 +668,13 @@ async function selfTest() {
 }
 document.addEventListener('DOMContentLoaded', () => {
   (async () => {
+    await indexHijackPromise;
     if ([await selfTest()].reduce((prev, curr) => {
       console.error(`[huzuni] some of the self tests failed, disabling huzuni`);
       return prev && curr;
     })) {
       console.log(`[huzuni] all self tests passed!`);
-
-      // Add css
-      {
-        const uiCssStyle = document.createElement('style');
-        uiCssStyle.innerHTML = css_248z;
-        document.head.appendChild(uiCssStyle);
-      }
+      huzuniUI.setupCSS();
       artworkProtocol.setupListeners();
       scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay());
       scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());

@@ -1,5 +1,4 @@
 import './meta.js?userscript-metadata';
-import uiCSS from './ui.css';
 
 import { rightPanel, topPanel } from './modules/panels';
 import { scriptManager } from './modules/script-manager';
@@ -8,12 +7,13 @@ import { artworkProtocol } from './modules/artwork-protocol';
 
 import HuzuniOverlay from './scripts/huzuni-overlay';
 import ArtworkHangover from './scripts/artwork-hangover';
+import { huzuniUI } from './modules/huzuni-ui';
 
 //
 // BEFORE DOM IS LOADED
 //
 
-rkgkInternals.insertNewIndex();
+const indexHijackPromise = rkgkInternals.insertNewIndex();
 
 // Create namespace for further use
 globalThis.huzuni = {};
@@ -59,6 +59,8 @@ async function selfTest() {
 
 document.addEventListener('DOMContentLoaded', () => {
   (async () => {
+    await indexHijackPromise;
+
     if (
       [await selfTest()].reduce((prev, curr) => {
         console.error(
@@ -69,13 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ) {
       console.log(`[huzuni] all self tests passed!`);
 
-      // Add css
-      {
-        const uiCssStyle = document.createElement('style');
-        uiCssStyle.innerHTML = uiCSS;
-        document.head.appendChild(uiCssStyle);
-      }
-
+      huzuniUI.setupCSS();
       artworkProtocol.setupListeners();
 
       scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay());

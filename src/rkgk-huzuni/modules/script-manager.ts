@@ -12,13 +12,15 @@ class ScriptManager {
       console.error(
         `[huzuni] [script-manager] cannot load another script with name "${name}"`,
       );
-      return;
+      return false;
     }
 
     console.log(`[huzuni] [script-manager] registered new script "${name}"`);
 
     this.scripts.set(name, script);
     this.enableScript(name);
+
+    return true;
   }
 
   enableScript(name: string) {

@@ -39,3 +39,31 @@ declare module rkgk_session {
     onDisconnect: () => void;
   }): Promise<Session>;
 }
+
+declare module rkgk_code_editor {
+  class Selection {
+    constructor(anchor: number, cursor: number);
+
+    get start(): number;
+    get end(): number;
+
+    clampCursor(text: string);
+
+    set(text: string, n: number);
+    advance(text: string, n: number);
+  }
+
+  class CodeEditor extends HTMLElement {
+    get code(): string;
+    setCode(code: string);
+
+    getSelection(): Selection;
+    replace(selection: Selection, text: string);
+
+    undo();
+    redo();
+
+    // Anything else is generally useless for most usecases
+    // and can be added later.
+  }
+}

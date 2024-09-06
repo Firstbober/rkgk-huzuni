@@ -28,7 +28,7 @@ class RkGkInternals {
 
     try {
       const body = await import(`${path}`);
-      this.handleRkGkImports(body, name, path, true);
+      await this.handleRkGkImports(body, name, path, true);
       return true;
     } catch (error) {
       console.error(
@@ -65,21 +65,29 @@ class RkGkInternals {
       'rkgk/reticle-renderer.js',
       false,
     );
-
+    result &&= await this.handleRkGkImports(
+      null,
+      'code_editor',
+      'rkgk/code-editor.js',
+      false,
+    );
     return result;
   }
 
   insertNewIndex() {
-    const oldQuerySelector = document.querySelector;
-    document.querySelector = (value: string) => {
-      if (value != 'main') return oldQuerySelector.apply(document, [value]);
-      setTimeout(async () => {
-        document.querySelector = oldQuerySelector;
-        await this.importRkgkInternals();
-        await this.hijackIndex();
-      }, 1);
-      throw Error('[huzuni] got em');
-    };
+    return new Promise<void>((resolve) => {
+      const oldQuerySelector = document.querySelector;
+      document.querySelector = (value: string) => {
+        if (value != 'main') return oldQuerySelector.apply(document, [value]);
+        setTimeout(async () => {
+          document.querySelector = oldQuerySelector;
+          await this.importRkgkInternals();
+          resolve();
+          await this.hijackIndex();
+        }, 1);
+        throw Error('[huzuni] got em');
+      };
+    });
   }
 
   async hijackIndex() {

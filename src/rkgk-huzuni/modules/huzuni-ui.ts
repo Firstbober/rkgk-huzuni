@@ -1,5 +1,14 @@
+import uiTabsCSS from './ui/tabs.css';
+import uiButtonsFix from './ui/buttonsFix.css';
+
 class HuzuniUI {
-  tabs(labels: string[], content: HTMLDivElement[]): HTMLDivElement {
+  setupCSS() {
+    const style = document.createElement('style');
+    style.textContent = [uiTabsCSS, uiButtonsFix].join('\n');
+    document.body.appendChild(style);
+  }
+
+  tabs(labels: string[], content: HTMLElement[]): HTMLElement {
     const uiTabs = document.createElement('div');
     uiTabs.classList.add('huzuni-ui-tabs');
 
@@ -13,7 +22,13 @@ class HuzuniUI {
 
     const uiTabsContainer = document.createElement('div');
     uiTabsContainer.classList.add('huzuni-ui-tabs-container');
-    uiTabsContainer.append(...content);
+    uiTabsContainer.append(
+      ...content.map((e) => {
+        const d = document.createElement('div');
+        d.appendChild(e);
+        return d;
+      }),
+    );
 
     uiTabs.appendChild(uiTabsContainer);
 
