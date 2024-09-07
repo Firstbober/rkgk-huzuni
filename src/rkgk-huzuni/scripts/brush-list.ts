@@ -100,6 +100,7 @@ export class BrushList implements HuzuniScript {
   }
 
   start(api: HuzuniAPI): void {
+    this.api = api;
     const rkgkCodeEditor = api.rightPanel.getCodeEditor();
 
     this.brushListRoot = document.createElement('div');
