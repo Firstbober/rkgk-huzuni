@@ -257,7 +257,7 @@ class ScriptManager {
     const root = document.createElement('div');
 
     // Editor
-    const rkgkCodeEditor = new rkgk_code_editor.CodeEditor();
+    const rkgkCodeEditor = new rkgk_code_editor.CodeEditor([]);
     root.appendChild(rkgkCodeEditor);
     root.style['marginTop'] = '6px';
 

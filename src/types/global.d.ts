@@ -54,6 +54,10 @@ declare module rkgk_code_editor {
   }
 
   class CodeEditor extends HTMLElement {
+    // I don't know what type should be there
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(layers: any[]);
+
     get code(): string;
     setCode(code: string);
 
