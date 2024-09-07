@@ -10,13 +10,14 @@
   },
   "scripts": {
     "prepare": "husky",
+    "types": "tsc --emitDeclarationOnly --outDir dist/types && cp src/types/global.d.ts dist/types",
     "dev": "rollup -wc",
     "clean": "del-cli dist",
     "lint": "eslint --ext .ts,.tsx . && prettier --ignore-path .eslintignore --check .",
     "lint:fix": "eslint --ext .ts,.tsx --fix . && prettier --ignore-path .eslintignore --write .",
     "ci": "run-s lint clean build:js",
     "build:js": "rollup -c",
-    "build": "cross-env NODE_ENV=production run-s lint clean build:js"
+    "build": "cross-env NODE_ENV=production run-s lint clean build:js types"
   },
   "dependencies": {
     "@babel/runtime": "^7.24.1",

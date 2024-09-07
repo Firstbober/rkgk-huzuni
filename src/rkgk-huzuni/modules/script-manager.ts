@@ -8,7 +8,7 @@ interface ScriptData {
   canBeDisabled: boolean;
 }
 
-class ScriptManager {
+export class ScriptManager {
   scripts = new Map<string, ScriptData>();
 
   test() {

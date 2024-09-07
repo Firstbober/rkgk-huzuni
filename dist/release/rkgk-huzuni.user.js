@@ -916,6 +916,7 @@ class BrushList {
     localStorage.setItem('huzuni.brush-list.brushes', JSON.stringify(Object.fromEntries(this.brushes)));
   }
   start(api) {
+    this.api = api;
     const rkgkCodeEditor = api.rightPanel.getCodeEditor();
     this.brushListRoot = document.createElement('div');
     this.brushListRoot.style.display = 'flex';
@@ -989,6 +990,8 @@ stroke 8 #000 (vec 0 0)
   }
 }
 
+// import { CustomVariables } from './scripts/custom-variables';
+
 //
 // BEFORE DOM IS LOADED
 //
@@ -1039,6 +1042,11 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         scriptManager.registerScript('Artwork Hangover', 'Port of some of Artwork features', new ArtworkHangover());
         scriptManager.registerScript('Brush List', 'A brush list for your brush editor', new BrushList());
+        // scriptManager.registerScript(
+        //   'Custom Variables',
+        //   'Adds custom variables with UI editors',
+        //   new CustomVariables(),
+        // );
       } catch (error) {
         console.error(`[huzuni] Error while loading internal scripts:`, error);
       }

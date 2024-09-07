@@ -18,7 +18,7 @@ function bytesToBase64(bytes) {
   return btoa(binString);
 }
 
-class ArtworkProtocol {
+export class ArtworkProtocol {
   ARTWORK_MESSAGE_PREFIX = '-- ARTWORK ';
 
   test() {

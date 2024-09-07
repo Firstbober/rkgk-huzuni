@@ -9,7 +9,7 @@ import HuzuniOverlay from './scripts/huzuni-overlay';
 import ArtworkHangover from './scripts/artwork-hangover';
 import { huzuniUI } from './modules/huzuni-ui';
 import { BrushList } from './scripts/brush-list';
-import { CustomVariables } from './scripts/custom-variables';
+// import { CustomVariables } from './scripts/custom-variables';
 
 //
 // BEFORE DOM IS LOADED
@@ -87,11 +87,11 @@ document.addEventListener('DOMContentLoaded', () => {
           'A brush list for your brush editor',
           new BrushList(),
         );
-        scriptManager.registerScript(
-          'Custom Variables',
-          'Adds custom variables with UI editors',
-          new CustomVariables(),
-        );
+        // scriptManager.registerScript(
+        //   'Custom Variables',
+        //   'Adds custom variables with UI editors',
+        //   new CustomVariables(),
+        // );
       } catch (error) {
         console.error(`[huzuni] Error while loading internal scripts:`, error);
       }
