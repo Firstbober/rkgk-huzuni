@@ -9,6 +9,8 @@ export interface SessionEventHandlers {
       [index: string]: any;
     };
   }): void;
+  userJoined(sessionId: number, name: string): void;
+  userLeft(sessionId: number, name: string): void;
 }
 
 class RkGkInternals {
@@ -159,11 +161,14 @@ class RkGkInternals {
           brush: wallEvent.kind.init.brush,
           nickname: wallEvent.kind.nickname,
         });
+        this.events.userJoined(wallEvent.sessionId, wallEvent.kind.nickname);
       } else if (wallEvent.kind.event == 'leave') {
         for (let i = 0; i < this.session.wallInfo.online.length; i++) {
           const user = this.session.wallInfo.online[i];
-          if (user.sessionId == wallEvent.sessionId)
+          if (user.sessionId == wallEvent.sessionId) {
             this.session.wallInfo.online.splice(i, 1);
+            this.events.userLeft(wallEvent.sessionId, user.nickname);
+          }
         }
       }
     };
@@ -183,6 +188,8 @@ class RkGkInternals {
   events = new Proxy(
     {
       wall() {},
+      userJoined() {},
+      userLeft() {},
     } as SessionEventHandlers,
     new MixinHandler<SessionEventHandlers>(),
   );

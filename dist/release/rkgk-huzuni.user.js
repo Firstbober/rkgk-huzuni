@@ -108,7 +108,9 @@ class RkGkInternals {
     this.session = {};
     this.currentUserId = 0;
     this.events = new Proxy({
-      wall() {}
+      wall() {},
+      userJoined() {},
+      userLeft() {}
     }, new MixinHandler());
   }
   async handleRkGkImports(body, name, path, imported) {
@@ -205,10 +207,14 @@ class RkGkInternals {
           brush: wallEvent.kind.init.brush,
           nickname: wallEvent.kind.nickname
         });
+        this.events.userJoined(wallEvent.sessionId, wallEvent.kind.nickname);
       } else if (wallEvent.kind.event == 'leave') {
         for (let i = 0; i < this.session.wallInfo.online.length; i++) {
           const user = this.session.wallInfo.online[i];
-          if (user.sessionId == wallEvent.sessionId) this.session.wallInfo.online.splice(i, 1);
+          if (user.sessionId == wallEvent.sessionId) {
+            this.session.wallInfo.online.splice(i, 1);
+            this.events.userLeft(wallEvent.sessionId, user.nickname);
+          }
         }
       }
     };
@@ -718,18 +724,32 @@ class ArtworkHangover {
       }
     });
     chat.appendChild(textarea);
+    const addMessage = (content, system = false) => {
+      const message = document.createElement('span');
+      message.innerText = content;
+      message.style['borderBottom'] = '1px solid var(--color-panel-border)';
+      message.style['opacity'] = system ? '0.5' : '1.0';
+      messageList.appendChild(message);
+      messageList.scrollTo({
+        top: messageList.scrollHeight
+      });
+    };
 
     // Handle artwork messages
     api.artworkProtocol.events.message = (sessionId, json) => {
       if (!api.enabled) return;
       if (json.type != 'chatMessage') return;
-      const message = document.createElement('span');
-      message.innerText = `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`;
-      message.style['borderBottom'] = '1px solid var(--color-panel-border)';
-      messageList.appendChild(message);
-      messageList.scrollTo({
-        top: messageList.scrollHeight
-      });
+      addMessage(`<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`);
+    };
+
+    // User joined/left
+    api.rkgkInternals.events.userJoined = (sid, nickname) => {
+      if (!api.enabled) return;
+      addMessage(`User <${nickname}> joined!`, true);
+    };
+    api.rkgkInternals.events.userLeft = (sid, nickname) => {
+      if (!api.enabled) return;
+      addMessage(`User <${nickname}> left!`, true);
     };
     this.chatElement = chat;
     document.getElementsByTagName('main')[0].appendChild(chat);

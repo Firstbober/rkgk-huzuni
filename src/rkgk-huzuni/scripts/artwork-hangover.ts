@@ -53,19 +53,37 @@ export default class ArtworkHangover implements HuzuniScript {
 
     chat.appendChild(textarea);
 
-    // Handle artwork messages
-    api.artworkProtocol.events.message = (sessionId, json) => {
-      if (!api.enabled) return;
-      if (json.type != 'chatMessage') return;
-
+    const addMessage = (content: string, system: boolean = false) => {
       const message = document.createElement('span');
-      message.innerText = `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`;
+      message.innerText = content;
       message.style['borderBottom'] = '1px solid var(--color-panel-border)';
+      message.style['opacity'] = system ? '0.5' : '1.0';
 
       messageList.appendChild(message);
       messageList.scrollTo({
         top: messageList.scrollHeight,
       });
+    };
+
+    // Handle artwork messages
+    api.artworkProtocol.events.message = (sessionId, json) => {
+      if (!api.enabled) return;
+      if (json.type != 'chatMessage') return;
+
+      addMessage(
+        `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`,
+      );
+    };
+
+    // User joined/left
+    api.rkgkInternals.events.userJoined = (sid, nickname) => {
+      if (!api.enabled) return;
+      addMessage(`User <${nickname}> joined!`, true);
+    };
+
+    api.rkgkInternals.events.userLeft = (sid, nickname) => {
+      if (!api.enabled) return;
+      addMessage(`User <${nickname}> left!`, true);
     };
 
     this.chatElement = chat;
