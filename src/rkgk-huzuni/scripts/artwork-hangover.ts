@@ -1,5 +1,4 @@
 import { HuzuniAPI, HuzuniScript } from '../huzuni-api';
-import { rkgkInternals } from '../modules/rkgk-internals';
 
 export default class ArtworkHangover implements HuzuniScript {
   api: HuzuniAPI;
@@ -71,7 +70,7 @@ export default class ArtworkHangover implements HuzuniScript {
       if (json.type != 'chatMessage') return;
 
       addMessage(
-        `<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`,
+        `<${api.rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`,
       );
     };
 

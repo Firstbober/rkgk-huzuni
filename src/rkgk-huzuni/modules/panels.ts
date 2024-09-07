@@ -8,18 +8,19 @@ class TopPanel {
   }
 
   // Appends HTML element at the start of the panel
-  appendStart(element: HTMLElement, href?: string) {
+  appendStart(element: HTMLElement) {
     const panelElement = this.getPanelElement();
 
     const a = document.createElement('a');
     a.appendChild(element);
-    if (href) a.href = href;
 
     panelElement.insertBefore(
       document.createElement('hr'),
       panelElement.firstChild,
     );
     panelElement.insertBefore(a, panelElement.firstChild);
+
+    return a;
   }
 
   // Appends HTML element at the end of the panel

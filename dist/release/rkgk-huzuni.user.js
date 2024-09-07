@@ -3,10 +3,11 @@
 // @namespace   Violentmonkey Scripts
 // @description A modification loader for rkgk
 // @match       https://staging.rkgk.app/*
-// @version     0.0.0
+// @version     0.1.0
 // @author      Firstbober
 // @icon        https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png
 // @run-at      document-start
+// @grant       GM_info
 // @grant       none
 // ==/UserScript==
 
@@ -22,13 +23,13 @@ class TopPanel {
   }
 
   // Appends HTML element at the start of the panel
-  appendStart(element, href) {
+  appendStart(element) {
     const panelElement = this.getPanelElement();
     const a = document.createElement('a');
     a.appendChild(element);
-    if (href) a.href = href;
     panelElement.insertBefore(document.createElement('hr'), panelElement.firstChild);
     panelElement.insertBefore(a, panelElement.firstChild);
+    return a;
   }
 
   // Appends HTML element at the end of the panel
@@ -280,14 +281,16 @@ class ArtworkProtocol {
 }
 const artworkProtocol = new ArtworkProtocol();
 
-var css_248z$1 = ".huzuni-ui-tabs{border:1px solid var(--color-panel-border);display:flex;flex-direction:column}.huzuni-ui-tabs>div:first-child{border-bottom:1px solid var(--color-panel-border);display:flex}.huzuni-ui-tabs>div:first-child span{cursor:pointer;padding:4px 6px}.huzuni-ui-tabs>div:first-child span:hover{background-color:var(--color-shaded-background)}.huzuni-ui-tabs>div:first-child span.active{background-color:var(--color-panel-border)}";
+var css_248z$2 = ".huzuni-ui-tabs{border:1px solid var(--color-panel-border);display:flex;flex-direction:column}.huzuni-ui-tabs>div:first-child{border-bottom:1px solid var(--color-panel-border);display:flex}.huzuni-ui-tabs>div:first-child span{cursor:pointer;padding:4px 6px}.huzuni-ui-tabs>div:first-child span:hover{background-color:var(--color-shaded-background)}.huzuni-ui-tabs>div:first-child span.active{background-color:var(--color-panel-border)}";
 
-var css_248z = "button{cursor:pointer}button:hover{background-color:var(--color-shaded-background)}button:disabled{opacity:.5}";
+var css_248z$1 = ".huzuni-ui-dialog-container{align-items:center;background-color:rgba(0,0,0,.8);box-sizing:border-box;display:flex;height:100vh;justify-content:center;left:0;padding-bottom:4vh;position:absolute;top:0;width:100vw}.huzuni-ui-dialog{display:flex;flex-direction:column;height:100%;max-height:600px;min-height:300px;min-width:600px;padding:16px}.huzuni-ui-dialog>span{font-size:larger;margin-bottom:8px}";
+
+var css_248z = "button{cursor:pointer;outline:none}button:hover{background-color:var(--color-shaded-background)}button:disabled{opacity:.5}";
 
 class HuzuniUI {
   setupCSS() {
     const style = document.createElement('style');
-    style.textContent = [css_248z$1, css_248z].join('\n');
+    style.textContent = [css_248z$2, css_248z, css_248z$1].join('\n');
     document.body.appendChild(style);
   }
   tabs(labels, content) {
@@ -303,6 +306,8 @@ class HuzuniUI {
     uiTabs.appendChild(uiTabsButtonsContainer);
     const uiTabsContainer = document.createElement('div');
     uiTabsContainer.classList.add('huzuni-ui-tabs-container');
+    uiTabsContainer.style.display = 'flex';
+    uiTabsContainer.style.height = '100%';
     uiTabsContainer.append(...content.map(e => {
       const d = document.createElement('div');
       d.appendChild(e);
@@ -312,6 +317,9 @@ class HuzuniUI {
     const uiTabsButtons = uiTabs.querySelectorAll('.huzuni-ui-tabs-labels>span');
     const uiTabsContent = uiTabs.querySelectorAll('.huzuni-ui-tabs-container>*');
     for (let y = 0; y < uiTabsContent.length; y++) {
+      uiTabsContent[y].style.height = '100%';
+      uiTabsContent[y].style.width = '100%';
+      uiTabsContent[y].style.boxSizing = 'border-box';
       if (y == 0) continue;
       uiTabsContent[y].style['display'] = 'none';
     }
@@ -328,6 +336,27 @@ class HuzuniUI {
     }
     uiTabsButtons[0].classList.add('active');
     return uiTabs;
+  }
+  dialog(title, content) {
+    const root = document.createElement('div');
+    root.classList.add('huzuni-ui-dialog-container');
+    const dialog = document.createElement('div');
+    dialog.classList.add('huzuni-ui-dialog', 'rkgk-panel');
+    dialog.innerHTML = `
+      <span>${title}</span>
+      <div class="element-container" style="height: 100%"></div>
+    `;
+    dialog.querySelector('.element-container').appendChild(content);
+    root.appendChild(dialog);
+    document.body.appendChild(root);
+    return {
+      show: () => {
+        root.style.display = 'flex';
+      },
+      hide: () => {
+        root.style.display = 'none';
+      }
+    };
   }
 }
 const huzuniUI = new HuzuniUI();
@@ -419,8 +448,6 @@ class ScriptManager {
       scripts: 'huzuni-overlay.script-manager.scripts'
     };
     this.api = api;
-    this.setupScriptManagerUI();
-    this.checkScriptStorage();
   }
   getScriptMetadata(code) {
     let splitted = code.split('==Huzuni Script==');
@@ -566,6 +593,12 @@ class ScriptManager {
   }
   createCodeEditor() {
     const root = document.createElement('div');
+    root.style.display = 'flex';
+    root.style.flexDirection = 'column';
+    root.style.width = '100%';
+    root.style.overflowY = 'auto';
+    root.style.overflowX = 'hidden';
+    root.style.boxSizing = 'border-box';
 
     // Editor
     const rkgkCodeEditor = new rkgk_code_editor.CodeEditor([]);
@@ -574,6 +607,7 @@ class ScriptManager {
     rkgkCodeEditor.addEventListener('.codeChanged', () => {
       localStorage.setItem(this.storageKeys.code, rkgkCodeEditor.code);
     });
+    rkgkCodeEditor.style.boxSizing = 'border-box';
 
     // Error listing
     const errors = document.createElement('pre');
@@ -624,18 +658,13 @@ class ScriptManager {
     };
   }
   setupScriptManagerUI() {
-    const scriptManagerUI = document.createElement('div');
-    scriptManagerUI.style['padding'] = '8px';
-    scriptManagerUI.innerHTML = `
-      <span style="font-size: medium;">Script Manager</span>
-    `;
     const codeEditor = this.createCodeEditor();
     this.scriptListNode = document.createElement('div');
     this.scriptListNode.style.display = 'flex';
     this.scriptListNode.style.flexDirection = 'column';
-    this.scriptListNode.style.maxHeight = '300px';
     this.scriptListNode.style.overflowY = 'auto';
     this.scriptListNode.style.width = '100%';
+    this.scriptListNode.style.height = '100%';
     this.scriptListNode.style.boxSizing = 'border-box';
     for (const script of scriptManager.scripts) {
       const node = this.getScriptListElement(script[0], script[1].description, 'huzuni');
@@ -653,31 +682,91 @@ class ScriptManager {
       if (!script[1].canBeDisabled) node.querySelector('.disable').disabled = true;
       this.scriptListNode.appendChild(node);
     }
-    scriptManagerUI.appendChild(this.api.huzuniUI.tabs(['Code Editor', 'Script List'], [codeEditor.root, this.scriptListNode]));
-    this.api.rightPanel.appendEnd(scriptManagerUI);
-    codeEditor.finish();
+    const OK = document.createElement('button');
+    OK.style.marginTop = 'auto';
+    OK.textContent = 'Confirm';
+    OK.addEventListener('click', () => {
+      window.location.reload();
+    });
+    this.scriptListNode.appendChild(OK);
+    return [{
+      element: this.scriptListNode,
+      finish: () => {}
+    }, {
+      element: codeEditor.root,
+      finish: codeEditor.finish
+    }];
   }
 }
 class HuzuniOverlay {
   constructor() {
     this.storageKeys = {};
   }
-  setupHuzuniMenuBar() {
+  setupHuzuniMenuBar(showDialog) {
     const huzuniButton = document.createElement('div');
     huzuniButton.innerHTML = `
       <img src="https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png" width="16" height="16"
         style="margin-right: 4px;" />
-      <span>huzuni</span>
+      <span>huzuni menu</span>
     `;
     huzuniButton.style['display'] = 'flex';
-    this.api.topPanel.appendStart(huzuniButton, 'https://github.com/Firstbober/rkgk-huzuni');
+    const el = this.api.topPanel.appendStart(huzuniButton);
+    el.addEventListener('click', ev => {
+      showDialog();
+      ev.stopPropagation();
+      ev.preventDefault();
+    });
+    el.style.cursor = 'pointer';
     huzuniButton.parentElement.style['paddingLeft'] = '4px';
     huzuniButton.parentElement.style['paddingRight'] = '4px';
   }
+  setupInfoPanel(hide) {
+    const root = document.createElement('div');
+    root.style.display = 'flex';
+    root.style.flexDirection = 'column';
+    root.style.height = '100%';
+    root.style.width = '100%';
+    root.innerHTML = `
+      <div style="width:100%; display: flex; align-items: center; justify-content: center;">
+        <img src="https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png" width="64" height="64"
+        style="margin-right: 32px;" />
+        <span style="font-size: 5em; font-weight: bold;">Huzuni ${GM_info.script.version}</span>
+      </div>
+      <div style="width:100%; display: flex; align-items: center; justify-content: center; flex-direction:column">
+        <span>made by firstbober & huzuni contributors (if there are any)</span>
+        <span>2024-????</span>
+      </div>
+      <button class="close" style="margin-top:auto">Close</button>
+    `;
+    root.querySelector('.close').addEventListener('click', () => {
+      hide();
+    });
+    return root;
+  }
   start(api) {
     this.api = api;
-    this.setupHuzuniMenuBar();
-    this.scriptManager = new ScriptManager(api);
+
+    // Make script manager work
+    let dialogMethods = {
+      show: () => {},
+      hide: () => {}
+    };
+    {
+      this.scriptManager = new ScriptManager(api);
+      const scriptManagerElements = this.scriptManager.setupScriptManagerUI();
+      const tabs = this.api.huzuniUI.tabs(['Info', 'Script List', 'Code Editor'], [this.setupInfoPanel(() => {
+        dialogMethods.hide();
+      }), scriptManagerElements[0].element, scriptManagerElements[1].element]);
+      tabs.style.height = '100%';
+      dialogMethods = api.huzuniUI.dialog('Huzuni Settings', tabs);
+      dialogMethods.hide();
+      scriptManagerElements[0].finish();
+      scriptManagerElements[1].finish();
+      this.scriptManager.checkScriptStorage();
+    }
+
+    // Huzuni menu bar
+    this.setupHuzuniMenuBar(dialogMethods.show);
   }
   stop() {}
 }
@@ -739,7 +828,7 @@ class ArtworkHangover {
     api.artworkProtocol.events.message = (sessionId, json) => {
       if (!api.enabled) return;
       if (json.type != 'chatMessage') return;
-      addMessage(`<${rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`);
+      addMessage(`<${api.rkgkInternals.getUsernameBySessionId(sessionId)}>: ${json.message}`);
     };
 
     // User joined/left

@@ -1,10 +1,11 @@
 import uiTabsCSS from './ui/tabs.css';
+import uiDialogCSS from './ui/dialog.css';
 import uiButtonsFix from './ui/buttonsFix.css';
 
 class HuzuniUI {
   setupCSS() {
     const style = document.createElement('style');
-    style.textContent = [uiTabsCSS, uiButtonsFix].join('\n');
+    style.textContent = [uiTabsCSS, uiButtonsFix, uiDialogCSS].join('\n');
     document.body.appendChild(style);
   }
 
@@ -23,6 +24,8 @@ class HuzuniUI {
 
     const uiTabsContainer = document.createElement('div');
     uiTabsContainer.classList.add('huzuni-ui-tabs-container');
+    uiTabsContainer.style.display = 'flex';
+    uiTabsContainer.style.height = '100%';
     uiTabsContainer.append(
       ...content.map((e) => {
         const d = document.createElement('div');
@@ -41,6 +44,9 @@ class HuzuniUI {
     );
 
     for (let y = 0; y < uiTabsContent.length; y++) {
+      (uiTabsContent[y] as HTMLElement).style.height = '100%';
+      (uiTabsContent[y] as HTMLElement).style.width = '100%';
+      (uiTabsContent[y] as HTMLElement).style.boxSizing = 'border-box';
       if (y == 0) continue;
       (uiTabsContent[y] as HTMLDivElement).style['display'] = 'none';
     }
@@ -62,6 +68,37 @@ class HuzuniUI {
     uiTabsButtons[0].classList.add('active');
 
     return uiTabs;
+  }
+
+  dialog(
+    title: string,
+    content: HTMLElement,
+  ): {
+    show: () => void;
+    hide: () => void;
+  } {
+    const root = document.createElement('div');
+    root.classList.add('huzuni-ui-dialog-container');
+
+    const dialog = document.createElement('div');
+    dialog.classList.add('huzuni-ui-dialog', 'rkgk-panel');
+    dialog.innerHTML = `
+      <span>${title}</span>
+      <div class="element-container" style="height: 100%"></div>
+    `;
+    dialog.querySelector('.element-container').appendChild(content);
+
+    root.appendChild(dialog);
+
+    document.body.appendChild(root);
+    return {
+      show: () => {
+        root.style.display = 'flex';
+      },
+      hide: () => {
+        root.style.display = 'none';
+      },
+    };
   }
 }
 
