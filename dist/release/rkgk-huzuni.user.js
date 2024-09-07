@@ -50,6 +50,12 @@ class RightPanel {
   getPanelElement() {
     return document.querySelectorAll('div#panels-overlay.panels.fullscreen div.right')[0];
   }
+  getBrushEditorElement() {
+    return document.querySelectorAll('rkgk-brush-editor.rkgk-panel')[0];
+  }
+  getCodeEditor() {
+    return document.querySelectorAll('rkgk-brush-editor.rkgk-panel > rkgk-code-editor')[0];
+  }
   appendEnd(element) {
     const panel = this.getPanelElement();
     element.style['marginLeft'] += '16px';
@@ -270,7 +276,7 @@ const artworkProtocol = new ArtworkProtocol();
 
 var css_248z$1 = ".huzuni-ui-tabs{border:1px solid var(--color-panel-border);display:flex;flex-direction:column}.huzuni-ui-tabs>div:first-child{border-bottom:1px solid var(--color-panel-border);display:flex}.huzuni-ui-tabs>div:first-child span{cursor:pointer;padding:4px 6px}.huzuni-ui-tabs>div:first-child span:hover{background-color:var(--color-shaded-background)}.huzuni-ui-tabs>div:first-child span.active{background-color:var(--color-panel-border)}";
 
-var css_248z = "button{cursor:pointer}button:hover{background-color:var(--color-shaded-background)}";
+var css_248z = "button{cursor:pointer}button:hover{background-color:var(--color-shaded-background)}button:disabled{opacity:.5}";
 
 class HuzuniUI {
   setupCSS() {
@@ -339,13 +345,14 @@ let ScriptManager$1 = class ScriptManager {
   test() {
     return true;
   }
-  registerScript(name, script, canBeDisabled = true) {
+  registerScript(name, description, script, canBeDisabled = true) {
     if (this.scripts.has(name)) {
       console.error(`[huzuni] [script-manager] cannot load another script with name "${name}"`);
       return false;
     }
     console.log(`[huzuni] [script-manager] registered new script "${name}"`);
     this.scripts.set(name, {
+      description,
       script,
       enabled: false,
       canBeDisabled
@@ -486,7 +493,7 @@ class ScriptManager {
       if (!script.enabled) continue;
       console.log(`[huzuni-overlay] loading script "${script.metadata.name}" by "${script.metadata.author}"...`);
       try {
-        store[id].enabled = this.api.scriptManager.registerScript(id, new (new Function(script.code)())());
+        store[id].enabled = this.api.scriptManager.registerScript(id, store[id].metadata.description, new (new Function(script.code)())());
       } catch (error) {
         console.error(`[huzuni-overlay] [${id}] fatal error:`, error);
         continue;
@@ -555,7 +562,7 @@ class ScriptManager {
     const root = document.createElement('div');
 
     // Editor
-    const rkgkCodeEditor = new rkgk_code_editor.CodeEditor();
+    const rkgkCodeEditor = new rkgk_code_editor.CodeEditor([]);
     root.appendChild(rkgkCodeEditor);
     root.style['marginTop'] = '6px';
     rkgkCodeEditor.addEventListener('.codeChanged', () => {
@@ -625,7 +632,7 @@ class ScriptManager {
     this.scriptListNode.style.width = '100%';
     this.scriptListNode.style.boxSizing = 'border-box';
     for (const script of scriptManager.scripts) {
-      const node = this.getScriptListElement(script[0], 'huzuni internal script', 'huzuni');
+      const node = this.getScriptListElement(script[0], script[1].description, 'huzuni');
       node.querySelector('.delete').remove();
       node.querySelector('.disable').checked = script[1].enabled;
       node.querySelector('.disable').addEventListener('change', () => {
@@ -732,6 +739,147 @@ class ArtworkHangover {
   }
 }
 
+class BrushList {
+  constructor() {
+    this.brushes = new Map();
+    this.reservedBrushes = ['last-session', 'default-1'];
+  }
+  addBrush() {
+    const ids = [];
+    for (const option of this.brushList.options) {
+      ids.push(option.value);
+    }
+    let brushId = `New Brush`;
+    let iteration = 1;
+    while (ids.includes(brushId)) {
+      brushId = `New Brush ${iteration}`;
+      iteration += 1;
+    }
+    const option = document.createElement('option');
+    option.value = brushId;
+    option.text = brushId;
+    this.brushList.options.add(option);
+    this.brushList.value = brushId;
+    this.removeButton.disabled = false;
+    this.brushes.set(brushId, {
+      name: brushId,
+      code: ''
+    });
+  }
+  removeBrush(name) {
+    this.brushes.delete(name);
+    localStorage.setItem('huzuni.brush-list.brushes', JSON.stringify(Object.fromEntries(this.brushes)));
+  }
+  getBrush(name) {
+    return this.brushes.get(name).code;
+  }
+  changeBrush(name, code) {
+    if (this.reservedBrushes.includes(name)) return;
+    if (code.length > 0) {
+      if (code[0] == '-') {
+        let accumulatedText = '';
+        for (const char of code) {
+          if (char == '\n') {
+            break;
+          }
+          accumulatedText += char;
+        }
+        if (accumulatedText.startsWith('--')) {
+          for (const option of this.brushList.options) {
+            if (option.value != name) continue;
+            const newName = accumulatedText.slice(2).trim();
+            if (newName.length < 1) break;
+            option.text = newName;
+            this.brushes.set(name, {
+              code,
+              name: newName
+            });
+            localStorage.setItem('huzuni.brush-list.brushes', JSON.stringify(Object.fromEntries(this.brushes)));
+            return;
+          }
+        }
+      }
+    }
+    this.brushes.set(name, {
+      code,
+      name
+    });
+    localStorage.setItem('huzuni.brush-list.brushes', JSON.stringify(Object.fromEntries(this.brushes)));
+  }
+  start(api) {
+    const rkgkCodeEditor = api.rightPanel.getCodeEditor();
+    this.brushListRoot = document.createElement('div');
+    this.brushListRoot.style.display = 'flex';
+    this.brushListRoot.style.marginBottom = '12px';
+    this.brushListRoot.innerHTML = `
+      <select class="brush-list" style="width: 100%; outline: none; margin-right: 4px;">
+        <option value="last-session">Last Session</option>
+        <option value="default-1">Default 1</option>
+      </select>
+      <button style="white-space: nowrap; margin-right:4px" class="new">New</button>
+      <button style="background-color:var(--color-error); color: white;" class="remove" disabled>Remove</button>
+    `;
+    this.brushList = this.brushListRoot.querySelector('.brush-list');
+    const newButton = this.brushListRoot.querySelector('.new');
+    this.removeButton = this.brushListRoot.querySelector('.remove');
+    this.brushList.addEventListener('change', () => {
+      const brushId = this.brushList.value;
+
+      // Enable delete button
+      this.removeButton.disabled = this.reservedBrushes.includes(brushId);
+      if (brushId == 'last-session') {
+        var _localStorage$getItem;
+        rkgkCodeEditor.setCode((_localStorage$getItem = localStorage.getItem('rkgk.brushEditor.code')) != null ? _localStorage$getItem : ':) no brush saved');
+        return;
+      }
+      if (brushId == 'default-1') {
+        rkgkCodeEditor.setCode(`
+-- This is your brush.
+-- Try playing around with the numbers,
+-- and see what happens!
+
+stroke 8 #000 (vec 0 0)
+`.trim());
+        return;
+      }
+      rkgkCodeEditor.setCode(this.getBrush(brushId));
+    });
+    newButton.addEventListener('click', () => {
+      this.addBrush();
+      rkgkCodeEditor.setCode('');
+    });
+    this.removeButton.addEventListener('click', () => {
+      for (const option of this.brushList.options) {
+        if (option.value == this.brushList.value) {
+          option.remove();
+          this.removeButton.disabled = true;
+          this.removeBrush(option.value);
+        }
+      }
+    });
+    rkgkCodeEditor.addEventListener('.codeChanged', () => {
+      if (!api.enabled) return;
+      if (this.reservedBrushes.includes(this.brushList.value)) return;
+      this.changeBrush(this.brushList.value, rkgkCodeEditor.code);
+    });
+    const storageObject = localStorage.getItem('huzuni.brush-list.brushes');
+    if (storageObject != null) {
+      this.brushes = new Map(Object.entries(JSON.parse(storageObject)));
+      for (const [name, brush] of this.brushes.entries()) {
+        const option = document.createElement('option');
+        option.text = brush.name;
+        option.value = name;
+        this.brushList.options.add(option);
+      }
+    }
+    const brushEditorPanel = api.rightPanel.getBrushEditorElement();
+    brushEditorPanel.insertBefore(this.brushListRoot, brushEditorPanel.firstChild);
+  }
+  stop() {
+    this.brushListRoot.remove();
+  }
+}
+
 //
 // BEFORE DOM IS LOADED
 //
@@ -779,9 +927,15 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log(`[huzuni] all self tests passed!`);
       huzuniUI.setupCSS();
       artworkProtocol.setupListeners();
-      scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());
+      try {
+        scriptManager.registerScript('Artwork Hangover', 'Port of some of Artwork features', new ArtworkHangover());
+        scriptManager.registerScript('Brush List', 'A brush list for your brush editor', new BrushList());
+      } catch (error) {
+        console.error(`[huzuni] Error while loading internal scripts:`, error);
+      }
+
       // Always must be last
-      scriptManager.registerScript('Huzuni Overlay', new HuzuniOverlay(), false);
+      scriptManager.registerScript('Huzuni Overlay', 'Huzuni user interface', new HuzuniOverlay(), false);
     }
   })();
 });

@@ -1,6 +1,7 @@
 import { HuzuniAPI, HuzuniScript } from '../huzuni-api';
 
 interface ScriptData {
+  description: string;
   script: HuzuniScript;
   apiInstance?: HuzuniAPI;
   enabled: boolean;
@@ -16,6 +17,7 @@ class ScriptManager {
 
   registerScript(
     name: string,
+    description: string,
     script: HuzuniScript,
     canBeDisabled: boolean = true,
   ) {
@@ -29,6 +31,7 @@ class ScriptManager {
     console.log(`[huzuni] [script-manager] registered new script "${name}"`);
 
     this.scripts.set(name, {
+      description,
       script,
       enabled: false,
       canBeDisabled,

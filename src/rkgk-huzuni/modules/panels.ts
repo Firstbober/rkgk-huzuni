@@ -49,6 +49,18 @@ class RightPanel {
     )[0] as HTMLDivElement;
   }
 
+  getBrushEditorElement(): HTMLDivElement {
+    return document.querySelectorAll(
+      'rkgk-brush-editor.rkgk-panel',
+    )[0] as HTMLDivElement;
+  }
+
+  getCodeEditor(): rkgk_code_editor.CodeEditor {
+    return document.querySelectorAll(
+      'rkgk-brush-editor.rkgk-panel > rkgk-code-editor',
+    )[0] as rkgk_code_editor.CodeEditor;
+  }
+
   appendEnd(element: HTMLElement) {
     const panel = this.getPanelElement();
     element.style['marginLeft'] += '16px';

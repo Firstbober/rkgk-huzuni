@@ -8,6 +8,7 @@ import { artworkProtocol } from './modules/artwork-protocol';
 import HuzuniOverlay from './scripts/huzuni-overlay';
 import ArtworkHangover from './scripts/artwork-hangover';
 import { huzuniUI } from './modules/huzuni-ui';
+import { BrushList } from './scripts/brush-list';
 
 //
 // BEFORE DOM IS LOADED
@@ -74,10 +75,25 @@ document.addEventListener('DOMContentLoaded', () => {
       huzuniUI.setupCSS();
       artworkProtocol.setupListeners();
 
-      scriptManager.registerScript('Artwork Hangover', new ArtworkHangover());
+      try {
+        scriptManager.registerScript(
+          'Artwork Hangover',
+          'Port of some of Artwork features',
+          new ArtworkHangover(),
+        );
+        scriptManager.registerScript(
+          'Brush List',
+          'A brush list for your brush editor',
+          new BrushList(),
+        );
+      } catch (error) {
+        console.error(`[huzuni] Error while loading internal scripts:`, error);
+      }
+
       // Always must be last
       scriptManager.registerScript(
         'Huzuni Overlay',
+        'Huzuni user interface',
         new HuzuniOverlay(),
         false,
       );

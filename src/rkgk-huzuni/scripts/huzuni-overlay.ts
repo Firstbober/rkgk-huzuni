@@ -160,6 +160,7 @@ class ScriptManager {
       try {
         store[id].enabled = this.api.scriptManager.registerScript(
           id,
+          store[id].metadata.description,
           new (new Function(script.code)())(),
         );
       } catch (error) {
@@ -341,7 +342,7 @@ class ScriptManager {
     for (const script of huzuni_scriptManager.scripts) {
       const node = this.getScriptListElement(
         script[0],
-        'huzuni internal script',
+        script[1].description,
         'huzuni',
       );
       node.querySelector('.delete').remove();
