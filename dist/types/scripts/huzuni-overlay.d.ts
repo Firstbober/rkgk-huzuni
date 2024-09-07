@@ -11,6 +11,8 @@ declare class ScriptManager {
     storageKeys: {
         code: string;
         scripts: string;
+        liveReloadURL: string;
+        liveReloadCode: string;
     };
     constructor(api: HuzuniAPI);
     getScriptMetadata(code: string): {
@@ -26,12 +28,17 @@ declare class ScriptManager {
     };
     getScriptListElement(name: string, description: string, author: string): HTMLDivElement;
     checkScriptStorage(): void;
+    checkLiveReloadURL(): void;
     addScript(metadata: ScriptMetadata, code: string): boolean;
     removeScript(id: string): void;
     enableScript(id: string): boolean;
     disableScript(id: string): void;
     createCodeEditor(): {
         root: HTMLDivElement;
+        finish: () => void;
+    };
+    createLiveCodeReload(): {
+        element: HTMLDivElement;
         finish: () => void;
     };
     setupScriptManagerUI(): {

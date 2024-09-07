@@ -78,6 +78,12 @@ export class ScriptManager {
     this.scripts.get(name).enabled = false;
     this.scripts.get(name).script.stop();
   }
+
+  removeScript(name: string) {
+    console.log(`[huzuni] [script-manager] removing script "${name}"`);
+    this.disableScript(name);
+    this.scripts.delete(name);
+  }
 }
 
 export const scriptManager = new ScriptManager();

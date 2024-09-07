@@ -8,6 +8,7 @@
 // @icon        https://raw.githubusercontent.com/Firstbober/rkgk-huzuni/master/static/logo.png
 // @run-at      document-start
 // @grant       GM_info
+// @grant       GM_xmlhttpRequest
 // @grant       none
 // ==/UserScript==
 
@@ -417,6 +418,11 @@ let ScriptManager$1 = class ScriptManager {
     this.scripts.get(name).enabled = false;
     this.scripts.get(name).script.stop();
   }
+  removeScript(name) {
+    console.log(`[huzuni] [script-manager] removing script "${name}"`);
+    this.disableScript(name);
+    this.scripts.delete(name);
+  }
 };
 const scriptManager = new ScriptManager$1();
 
@@ -445,7 +451,9 @@ class ScriptManager {
     this.loadedIds = [];
     this.storageKeys = {
       code: 'huzuni-overlay.script-manager.code',
-      scripts: 'huzuni-overlay.script-manager.scripts'
+      scripts: 'huzuni-overlay.script-manager.scripts',
+      liveReloadURL: 'huzuni-overlay.script-manager.livereloadurl',
+      liveReloadCode: 'huzuni-overlay.script-manager.livereloadcode'
     };
     this.api = api;
   }
@@ -550,8 +558,39 @@ class ScriptManager {
           this.disableScript(id);
         }
       });
-      this.scriptListNode.appendChild(node);
+      this.scriptListNode.insertBefore(node, this.scriptListNode.lastChild);
     }
+  }
+  checkLiveReloadURL() {
+    const url = localStorage.getItem(this.storageKeys.liveReloadURL);
+    if (url == null) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const sm = this;
+    GM_xmlhttpRequest({
+      method: 'GET',
+      url: url,
+      onload: function (response) {
+        const code = response.responseText;
+        const lastReloadCode = localStorage.getItem(sm.storageKeys.liveReloadCode);
+        if (lastReloadCode != null) {
+          if (lastReloadCode == code) return;
+        }
+        const metadata = sm.getScriptMetadata(code);
+        if (metadata.errors.length > 0) {
+          console.error(`[huzuni-overlay] error while live reloading script:`, metadata.errors);
+          return;
+        }
+        sm.removeScript(`${metadata.metadata.name}.${metadata.metadata.author}`);
+        if (!sm.addScript(metadata.metadata, code)) {
+          console.error(`[huzuni-overlay] error while live reloading; script with name "${metadata.metadata.name}" and author "${metadata.metadata.author}" is already there`);
+          return;
+        }
+        sm.enableScript(`${metadata.metadata.name}.${metadata.metadata.author}`);
+        localStorage.setItem(sm.storageKeys.liveReloadCode, code);
+        sm.checkScriptStorage();
+      }
+    });
   }
   addScript(metadata, code) {
     const scriptsStore = this.getScriptsStore();
@@ -568,8 +607,9 @@ class ScriptManager {
     return true;
   }
   removeScript(id) {
-    this.disableScript(id);
     const store = this.getScriptsStore();
+    if (store[id] == undefined) return;
+    this.api.scriptManager.removeScript(id);
     delete store[id];
     localStorage.setItem(this.storageKeys.scripts, JSON.stringify(store));
   }
@@ -657,6 +697,33 @@ class ScriptManager {
       }
     };
   }
+  createLiveCodeReload() {
+    const root = document.createElement('div');
+    root.style.display = 'flex';
+    root.style.flexDirection = 'column';
+    root.style.padding = '8px';
+    root.style.width = '100%';
+    root.innerHTML = `
+      <span style="margin-bottom: 8px">Enter URL to monitor for changes (click on this text when ready):</span>
+      <input type="text" placeholder="http://127.0.0.1:8080/....." />
+    `;
+    const urlInput = root.querySelector('input');
+    urlInput.value = localStorage.getItem(this.storageKeys.liveReloadURL);
+    urlInput.addEventListener('change', () => {
+      localStorage.setItem(this.storageKeys.liveReloadURL, urlInput.value);
+    });
+    return {
+      element: root,
+      finish: () => {
+        setInterval(async () => {
+          const newURL = localStorage.getItem(this.storageKeys.liveReloadURL);
+          if (newURL == null) return;
+          if (!newURL.startsWith('http')) return;
+          this.checkLiveReloadURL();
+        }, 500);
+      }
+    };
+  }
   setupScriptManagerUI() {
     const codeEditor = this.createCodeEditor();
     this.scriptListNode = document.createElement('div');
@@ -689,12 +756,16 @@ class ScriptManager {
       window.location.reload();
     });
     this.scriptListNode.appendChild(OK);
+    const liveCodeReload = this.createLiveCodeReload();
     return [{
       element: this.scriptListNode,
       finish: () => {}
     }, {
       element: codeEditor.root,
       finish: codeEditor.finish
+    }, {
+      element: liveCodeReload.element,
+      finish: liveCodeReload.finish
     }];
   }
 }
@@ -754,15 +825,16 @@ class HuzuniOverlay {
     {
       this.scriptManager = new ScriptManager(api);
       const scriptManagerElements = this.scriptManager.setupScriptManagerUI();
-      const tabs = this.api.huzuniUI.tabs(['Info', 'Script List', 'Code Editor'], [this.setupInfoPanel(() => {
+      const tabs = this.api.huzuniUI.tabs(['Info', 'Script List', 'Code Editor', 'Live Code Reload'], [this.setupInfoPanel(() => {
         dialogMethods.hide();
-      }), scriptManagerElements[0].element, scriptManagerElements[1].element]);
+      }), scriptManagerElements[0].element, scriptManagerElements[1].element, scriptManagerElements[2].element]);
       tabs.style.height = '100%';
       dialogMethods = api.huzuniUI.dialog('Huzuni Settings', tabs);
       dialogMethods.hide();
       scriptManagerElements[0].finish();
       scriptManagerElements[1].finish();
       this.scriptManager.checkScriptStorage();
+      scriptManagerElements[2].finish();
     }
 
     // Huzuni menu bar

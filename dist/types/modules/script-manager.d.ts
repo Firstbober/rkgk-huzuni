@@ -12,6 +12,7 @@ export declare class ScriptManager {
     registerScript(name: string, description: string, script: HuzuniScript, canBeDisabled?: boolean): boolean;
     enableScript(name: string): void;
     disableScript(name: string): void;
+    removeScript(name: string): void;
 }
 export declare const scriptManager: ScriptManager;
 export {};
